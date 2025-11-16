@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>OpenLibrary Search Results</h1>
+<p class="lead">Search query: "{{ query }}"</p>
+
+{% if results %}
+    <p>Found {{ results|length }} results</p>
+    
+    <div class="book-grid">
+        {% for book in results %}
+            <div class="book-card">
+                {% if book.cover_id %}
+                    <img src="https://covers.openlibrary.org/b/id/{{ book.cover_id }}-M.jpg" alt="{{ book.title }}" class="book-cover">
+                {% else %}
+                    <div class="book-cover-placeholder">📚</div>
+                {% endif %}
+                <h3>{{ book.title }}</h3>
+                {% if book.author %}
+                    <p class="author">by {{ book.author }}</p>
+                {% endif %}
+                <div class="book-meta">
+                    {% if book.publication_year %}
+                        <span>Published: {{ book.publication_year }}</span>
+                    {% endif %}
+                    {% if book.isbn %}
+                        <span>ISBN: {{ book.isbn }}</span>
+                    {% endif %}
+                </div>
+                
+                <form method="POST" action="{{ url_for('add_book_from_openlibrary') }}" class="mt-3">
+                    {{ form.hidden_tag() }}
+                    <input type="hidden" name="title" value="{{ book.title }}">
+                    <input type="hidden" name="author" value="{{ book.author }}">
+                    <input type="hidden" name="isbn" value="{{ book.isbn }}">
+                    <input type="hidden" name="openlibrary_id" value="{{ book.openlibrary_id }}">
+                    <input type="hidden" name="cover_id" value="{{ book.cover_id }}">
+                    <input type="hidden" name="publication_year" value="{{ book.publication_year }}">
+                    <button type="submit" class="btn btn-primary btn-sm">Add to Library</button>
+                </form>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No results found. Try a different search term.</p>
+{% endif %}
+
+<div class="section-actions mt-4">
+    <a href="{{ url_for('admin_books') }}" class="btn btn-secondary">Back to Books</a>
+</div>
+{% endblock %}

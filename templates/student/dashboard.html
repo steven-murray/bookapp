@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>My Reading Dashboard</h1>
+<p class="welcome-text">Welcome, {{ current_user.first_name }}!</p>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>{{ books_read|length }}</h3>
+        <p>Books Read</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ recent_reviews|length }}</h3>
+        <p>Reviews Written</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ reading_list|length }}</h3>
+        <p>In Reading List</p>
+    </div>
+</div>
+
+{% if books_read|length > 0 %}
+<div class="charts-section">
+    <h2>📊 My Reading Statistics</h2>
+    <div class="charts-grid">
+        <div class="chart-container">
+            <h3>Fiction vs. Non-Fiction</h3>
+            <canvas id="typeChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3>Genres Read</h3>
+            <canvas id="genreChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3>Books by Grade Level</h3>
+            <canvas id="gradeChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fiction vs. Non-Fiction Pie Chart
+    const typeCanvas = document.getElementById('typeChart');
+    if (typeCanvas) {
+        const typeCtx = typeCanvas.getContext('2d');
+        new Chart(typeCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Fiction', 'Non-Fiction'],
+                datasets: [{
+                    data: [{{ type_counts['Fiction'] }}, {{ type_counts['Non-Fiction'] }}],
+                    backgroundColor: ['#4a90e2', '#7b68ee']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Genre Pie Chart
+    const genreCanvas = document.getElementById('genreChart');
+    if (genreCanvas) {
+        const genreCtx = genreCanvas.getContext('2d');
+        new Chart(genreCtx, {
+            type: 'pie',
+            data: {
+                labels: {{ genre_counts.keys()|list|tojson }},
+                datasets: [{
+                    data: {{ genre_counts.values()|list|tojson }},
+                    backgroundColor: [
+                        '#4a90e2', '#7b68ee', '#2ecc71', '#e74c3c', '#f39c12',
+                        '#1abc9c', '#9b59b6', '#34495e', '#16a085', '#27ae60'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Grade Bar Chart
+    const gradeCanvas = document.getElementById('gradeChart');
+    if (gradeCanvas) {
+        const gradeCtx = gradeCanvas.getContext('2d');
+    const gradeLabels = {{ (grade_counts.keys()|list|map('string')|sort)|tojson|safe }};
+    const gradeCounts = {{ grade_counts|tojson|safe }};
+    const gradeData = gradeLabels.map(g => gradeCounts[g] || 0);
+        new Chart(gradeCtx, {
+            type: 'bar',
+            data: {
+                labels: gradeLabels.map(g => 'Grade ' + g),
+                datasets: [{
+                    label: 'Books Read',
+                    data: gradeData,
+                    backgroundColor: '#4a90e2'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endif %}
+
+{% if suggestions %}
+    <div class="suggestions-section">
+        <h2>📖 Book Suggestions for You</h2>
+        <div class="suggestion-cards">
+            {% for suggestion in suggestions %}
+                <div class="suggestion-card">
+                    <div class="suggestion-header">
+                        <h3>{{ suggestion.book.title }}</h3>
+                        {% if suggestion.book.author %}
+                            <p class="author">by {{ suggestion.book.author }}</p>
+                        {% endif %}
+                    </div>
+                    {% if suggestion.book.cover_url %}
+                        <img src="{{ suggestion.book.cover_url }}" alt="{{ suggestion.book.title }}" class="book-cover-sm">
+                    {% endif %}
+                    <div class="book-meta">
+                        {% if suggestion.book.book_type %}<span class="badge">{{ suggestion.book.book_type }}</span>{% endif %}
+                        {% if suggestion.book.genre %}<span class="badge">{{ suggestion.book.genre }}</span>{% endif %}
+                        {% if suggestion.book.sub_genre %}<span class="badge">{{ suggestion.book.sub_genre }}</span>{% endif %}
+                        {% if suggestion.book.lexile_rating %}<span class="badge">{{ suggestion.book.lexile_rating }}</span>{% endif %}
+                        {% if suggestion.book.grade is not none %}<span class="badge">Grade {{ suggestion.book.grade }}</span>{% endif %}
+                        {% if suggestion.book.owned == 'Physical' %}<span class="badge" title="Available physically">📚 Physical</span>{% endif %}
+                        {% if suggestion.book.owned == 'Kindle' %}<span class="badge" title="Available on Kindle">📱 Kindle</span>{% endif %}
+                    </div>
+                    {% if suggestion.reason %}
+                        <div class="suggestion-reason">
+                            <strong>Why this book:</strong>
+                            <p>{{ suggestion.reason }}</p>
+                        </div>
+                    {% endif %}
+                    <p class="suggested-by">Suggested by {{ suggestion.suggested_by.first_name }} {{ suggestion.suggested_by.last_name }}</p>
+                    <a href="{{ url_for('accept_suggestion', suggestion_id=suggestion.id) }}" class="btn btn-primary">Add to Reading List</a>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+
+<div class="dashboard-sections">
+    <div class="section">
+        <h2>📚 My Reading List ({{ reading_list|length }})</h2>
+        {% if reading_list %}
+            <ol class="reading-list-preview">
+                {% for item in reading_list[:5] %}
+                    <li>
+                        <div class="book-item">
+                            <strong>{{ item.book.title }}</strong>
+                            {% if item.book.author %}<span class="author">by {{ item.book.author }}</span>{% endif %}
+                            <span class="book-mini-meta">
+                                {% if item.book.book_type %}<span class="badge">{{ item.book.book_type }}</span>{% endif %}
+                                {% if item.book.genre %}<span class="badge">{{ item.book.genre }}</span>{% endif %}
+                                {% if item.book.sub_genre %}<span class="badge">{{ item.book.sub_genre }}</span>{% endif %}
+                                {% if item.book.lexile_rating %}<span class="badge">{{ item.book.lexile_rating }}</span>{% endif %}
+                                {% if item.book.grade is not none %}<span class="badge">Grade {{ item.book.grade }}</span>{% endif %}
+                                {% if item.book.owned == 'Physical' %}<span class="badge" title="Available physically">📚</span>{% endif %}
+                                {% if item.book.owned == 'Kindle' %}<span class="badge" title="Available on Kindle">📱</span>{% endif %}
+                            </span>
+                            <div class="book-actions">
+                                <a href="{{ url_for('mark_book_read', book_id=item.book.id) }}" class="btn btn-sm btn-success">Mark as Read</a>
+                            </div>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ol>
+            {% if reading_list|length > 5 %}
+                <p><a href="{{ url_for('student_reading_list') }}">View all {{ reading_list|length }} books</a></p>
+            {% endif %}
+        {% else %}
+            <p>Your reading list is empty. Start adding books!</p>
+        {% endif %}
+        <a href="{{ url_for('student_reading_list') }}" class="btn btn-secondary mt-3">Manage Reading List</a>
+    </div>
+
+    <div class="section">
+        <h2>✅ Recently Read ({{ books_read|length }} total)</h2>
+        {% if books_read %}
+            <div class="books-read-preview">
+                {% for br in books_read[:5] %}
+                    <div class="book-read-item">
+                        <div class="book-info">
+                            <strong>{{ br.book.title }}</strong>
+                            {% if br.book.author %}<span class="author">by {{ br.book.author }}</span>{% endif %}
+                            <span class="book-mini-meta">
+                                {% if br.book.book_type %}<span class="badge">{{ br.book.book_type }}</span>{% endif %}
+                                {% if br.book.genre %}<span class="badge">{{ br.book.genre }}</span>{% endif %}
+                                {% if br.book.sub_genre %}<span class="badge">{{ br.book.sub_genre }}</span>{% endif %}
+                                {% if br.book.lexile_rating %}<span class="badge">{{ br.book.lexile_rating }}</span>{% endif %}
+                                {% if br.book.grade is not none %}<span class="badge">Grade {{ br.book.grade }}</span>{% endif %}
+                                {% if br.book.owned == 'Physical' %}<span class="badge" title="Available physically">📚</span>{% endif %}
+                                {% if br.book.owned == 'Kindle' %}<span class="badge" title="Available on Kindle">📱</span>{% endif %}
+                            </span>
+                        </div>
+                        <span class="completed-date">{{ br.completed_at.strftime('%b %d, %Y') }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+            <a href="{{ url_for('books_read') }}" class="btn btn-secondary mt-3">View All Books Read</a>
+        {% else %}
+            <p>You haven't marked any books as read yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="section">
+        <h2>⭐ Recent Reviews</h2>
+        {% if recent_reviews %}
+            {% for review in recent_reviews %}
+                <div class="review-card-preview">
+                    <div class="review-header">
+                            <strong>{{ review.book.title }}</strong>
+                            <span class="rating">{{ '★' * (review.rating|int if review.rating is not none else 0) }}{{ '☆' * (5 - (review.rating|int if review.rating is not none else 0)) }}</span>
+                    </div>
+                    {% if review.favorite_part %}
+                        <p class="review-snippet">{{ review.favorite_part[:100] }}{% if review.favorite_part|length > 100 %}...{% endif %}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No reviews yet. Read a book and write your first review!</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

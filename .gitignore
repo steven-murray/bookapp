@@ -1,0 +1,59 @@
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+.env
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg
+*.eggs
+
+# Flask
+instance/
+*.db
+*.sqlite3
+*.sqlite
+*.log
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test/coverage
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+
+# Dependency/lock files
+*.lock
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+
+# Misc
+*.bak
+*.swp
+*.swo
+
+# Static assets
+static/__pycache__/
+
+# Ignore local settings
+config.py

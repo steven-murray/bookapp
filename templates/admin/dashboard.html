@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>Admin Dashboard</h1>
+<p class="welcome-text">Welcome, {{ current_user.first_name }} {{ current_user.last_name }}!</p>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>{{ classes|length }}</h3>
+        <p>Your Classes</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ total_students }}</h3>
+        <p>Total Students</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ total_books }}</h3>
+        <p>Books in Library</p>
+    </div>
+</div>
+
+<div class="dashboard-sections">
+    <div class="section">
+        <h2>Your Classes</h2>
+        {% if classes %}
+            <div class="class-list">
+                {% for cls in classes %}
+                    <div class="class-card">
+                        <h3><a href="{{ url_for('view_class', class_id=cls.id) }}">{{ cls.name }}</a></h3>
+                        <p>{{ cls.students|length }} students</p>
+                        {% if cls.description %}
+                            <p class="description">{{ cls.description }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No classes yet. <a href="{{ url_for('create_class') }}">Create your first class</a></p>
+        {% endif %}
+        <a href="{{ url_for('create_class') }}" class="btn btn-primary mt-3">Create New Class</a>
+    </div>
+
+    <div class="section">
+        <h2>Recent Reviews</h2>
+        {% if recent_reviews %}
+            <div class="review-list">
+                {% for review in recent_reviews %}
+                    <div class="review-item">
+                        <div class="review-header">
+                            <strong>{{ review.user.first_name }} {{ review.user.last_name }}</strong>
+                            <span class="rating">{{ '★' * review.rating }}{{ '☆' * (5 - review.rating) }}</span>
+                        </div>
+                        <p class="book-title">{{ review.book.title }}</p>
+                        <p class="review-date">{{ review.created_at.strftime('%B %d, %Y') }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No reviews yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="quick-actions">
+    <h2>Quick Actions</h2>
+    <div class="action-buttons">
+        <a href="{{ url_for('admin_books') }}" class="btn btn-secondary">Manage Books</a>
+        <a href="{{ url_for('upload_books') }}" class="btn btn-secondary">Upload Books (CSV)</a>
+        <a href="{{ url_for('admin_classes') }}" class="btn btn-secondary">Manage Classes</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Books - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>Upload Books from CSV</h1>
+
+<div class="info-box">
+    <h3>CSV Format</h3>
+    <p>Your CSV file should have the following columns:</p>
+    <ul>
+        <li><strong>title</strong> (required): Book title</li>
+        <li><strong>author</strong>: Author name</li>
+        <li><strong>isbn</strong>: ISBN (will fetch additional data from OpenLibrary)</li>
+        <li><strong>genre</strong>: Book genre</li>
+        <li><strong>topic</strong>: Book topic/subject</li>
+        <li><strong>lexile_rating</strong>: Lexile rating (e.g., 750L)</li>
+    </ul>
+    <p><a href="{{ url_for('download_sample_csv') }}" class="btn btn-secondary">Download Sample CSV</a></p>
+</div>
+
+<div class="form-container">
+    <form method="POST" action="{{ url_for('upload_books') }}" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.csv_file.label }}
+            {{ form.csv_file(class="form-control") }}
+            {% if form.csv_file.errors %}
+                <div class="error">
+                    {% for error in form.csv_file.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Upload and Import</button>
+            <a href="{{ url_for('admin_books') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

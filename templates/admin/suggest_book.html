@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Suggest Book - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>Suggest a Book to {{ student.first_name }} {{ student.last_name }}</h1>
+
+<div class="form-container">
+    <form method="POST" action="{{ url_for('suggest_book', student_id=student.id) }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            <label for="book_select">Select Book</label>
+            <select id="book_select" class="form-control" onchange="document.getElementById('book_id').value = this.value">
+                <option value="">Choose a book...</option>
+                {% for book in books %}
+                    <option value="{{ book.id }}">
+                        {{ book.title }}
+                        {% if book.author %} - {{ book.author }}{% endif %}
+                        {% if book.lexile_rating %} ({{ book.lexile_rating }}){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+            {{ form.book_id }}
+        </div>
+        
+        <div class="form-group">
+            {{ form.reason.label }}
+            {{ form.reason(class="form-control", rows="4", placeholder="Why do you think this book would be good for this student?") }}
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Suggest Book</button>
+            <a href="{{ url_for('view_student', student_id=student.id) }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

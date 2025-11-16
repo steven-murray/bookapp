@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Books - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>Manage Books</h1>
+
+<div class="section-header">
+    <div>
+        <a href="{{ url_for('create_book') }}" class="btn btn-primary">Add Book Manually</a>
+        <a href="{{ url_for('upload_books') }}" class="btn btn-secondary">Upload CSV</a>
+        <a href="{{ url_for('download_sample_csv') }}" class="btn btn-secondary">Download Sample CSV</a>
+    </div>
+    
+    <form method="POST" action="{{ url_for('search_openlibrary') }}" class="search-form">
+        {{ search_form.hidden_tag() }}
+        <div class="search-group">
+            {{ search_form.query(class="form-control", placeholder="Search OpenLibrary...") }}
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+</div>
+
+{% if books %}
+    <p>Total books: {{ books|length }}</p>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Cover</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Type</th>
+                <th>Genre</th>
+                <th>Sub-genre</th>
+                <th>Lexile</th>
+                <th>Grade</th>
+                <th>Owned</th>
+                <th>ISBN</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for book in books %}
+                <tr>
+                    <td>
+                        {% if book.cover_url %}
+                            <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="book-cover-sm">
+                        {% else %}
+                            <div class="book-cover-placeholder">📚</div>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ book.title }}</strong></td>
+                    <td>{{ book.author or 'N/A' }}</td>
+                    <td>{{ book.book_type or 'N/A' }}</td>
+                    <td>{{ book.genre or 'N/A' }}</td>
+                    <td>{{ book.sub_genre or 'N/A' }}</td>
+                    <td>{{ book.lexile_rating or 'N/A' }}</td>
+                    <td>{{ book.grade if book.grade is not none else 'N/A' }}</td>
+                    <td>{{ book.owned or 'Not Owned' }}</td>
+                    <td>{{ book.isbn or 'N/A' }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_book', book_id=book.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                        <form method="POST" action="{{ url_for('delete_book', book_id=book.id) }}" style="display:inline-block" onsubmit="return confirm('Delete this book? This cannot be undone.');">
+                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="empty-state">
+        <p>No books in the library yet.</p>
+        <a href="{{ url_for('create_book') }}" class="btn btn-primary">Add Your First Book</a>
+    </div>
+{% endif %}
+{% endblock %}

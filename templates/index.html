@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Book Tracker{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>📚 Welcome to Book Tracker</h1>
+    <p class="lead">A simple web application for students to track their reading journey</p>
+    
+    <div class="hero-buttons">
+        <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
+        <a href="{{ url_for('register') }}" class="btn btn-secondary">Register</a>
+    </div>
+</div>
+
+<div class="features">
+    <h2>Features</h2>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h3>👨‍🎓 For Students</h3>
+            <ul>
+                <li>Create and manage your reading list</li>
+                <li>Mark books as read</li>
+                <li>Write guided reviews and ratings</li>
+                <li>Track your reading progress</li>
+            </ul>
+        </div>
+        
+        <div class="feature-card">
+            <h3>👨‍🏫 For Administrators</h3>
+            <ul>
+                <li>Create and manage classes</li>
+                <li>Track student reading progress</li>
+                <li>Assign reading lists to classes</li>
+                <li>Suggest books to students</li>
+                <li>Upload books via CSV</li>
+            </ul>
+        </div>
+        
+        <div class="feature-card">
+            <h3>📖 Book Management</h3>
+            <ul>
+                <li>Integration with OpenLibrary.org</li>
+                <li>Genre and topic categorization</li>
+                <li>Lexile ratings for appropriate suggestions</li>
+                <li>Easy book search and discovery</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

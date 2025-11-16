@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}My Reading List - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>📚 My Reading List</h1>
+
+<form method="GET" action="{{ url_for('student_reading_list') }}" class="filter-form mb-4">
+    <div class="form-row">
+        <div class="form-group">
+            {{ filter_form.search.label }}
+            {{ filter_form.search(class="form-control", placeholder="Search title or author") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.book_type.label }}
+            {{ filter_form.book_type(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.genre.label }}
+            {{ filter_form.genre(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.sub_genre.label }}
+            {{ filter_form.sub_genre(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.min_grade.label }}
+            {{ filter_form.min_grade(class="form-control", placeholder="1") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.max_grade.label }}
+            {{ filter_form.max_grade(class="form-control", placeholder="12") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.owned.label }}
+            {{ filter_form.owned(class="form-control") }}
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Apply Filters</button>
+        <a href="{{ url_for('student_reading_list') }}" class="btn btn-secondary">Clear</a>
+    </div>
+</form>
+
+{% if reading_list %}
+    <p>You have {{ reading_list|length }} books in your reading list</p>
+    
+    <div class="reading-list-ordered">
+        {% for item in reading_list %}
+            <div class="reading-list-item">
+                <div class="item-number">{{ loop.index }}</div>
+                <div class="item-content">
+                    {% if item.book.cover_url %}
+                        <img src="{{ item.book.cover_url }}" alt="{{ item.book.title }}" class="book-cover-sm">
+                    {% else %}
+                        <div class="book-cover-placeholder-sm">📚</div>
+                    {% endif %}
+                    <div class="book-info">
+                        <h3>{{ item.book.title }}</h3>
+                        {% if item.book.author %}
+                            <p class="author">by {{ item.book.author }}</p>
+                        {% endif %}
+                        {% if item.book.genre %}
+                            <span class="badge">{{ item.book.genre }}</span>
+                        {% endif %}
+                        {% if item.book.book_type %}
+                            <span class="badge">{{ item.book.book_type }}</span>
+                        {% endif %}
+                        {% if item.book.sub_genre %}
+                            <span class="badge">{{ item.book.sub_genre }}</span>
+                        {% endif %}
+                        {% if item.book.lexile_rating %}
+                            <span class="badge">{{ item.book.lexile_rating }}</span>
+                        {% endif %}
+                        {% if item.book.grade is not none %}
+                            <span class="badge">Grade {{ item.book.grade }}</span>
+                        {% endif %}
+                        {% if item.book.owned == 'Physical' %}
+                            <span class="badge" title="Available physically">📚 Physical</span>
+                        {% elif item.book.owned == 'Kindle' %}
+                            <span class="badge" title="Available on Kindle">📱 Kindle</span>
+                        {% endif %}
+                        {% if item.book.description %}
+                            <p class="description">{{ item.book.description[:200] }}{% if item.book.description|length > 200 %}...{% endif %}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="item-actions">
+                    <a href="{{ url_for('mark_book_read', book_id=item.book.id) }}" class="btn btn-success">Mark as Read</a>
+                    <a href="{{ url_for('remove_from_reading_list', item_id=item.id) }}" 
+                       class="btn btn-danger" 
+                       onclick="return confirm('Remove from reading list?')">Remove</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <p>Your reading list is empty.</p>
+        <p>Browse available books below to add them to your list!</p>
+    </div>
+{% endif %}
+
+<div class="section mt-5">
+    <h2>Browse Books to Add</h2>
+    <form method="GET" action="{{ url_for('student_reading_list') }}" class="filter-form">
+        <div class="form-row">
+            <div class="form-group">
+                {{ filter_form.search.label }}
+                {{ filter_form.search(class="form-control", placeholder="Search title or author") }}
+            </div>
+            <div class="form-group">
+                {{ filter_form.book_type.label }}
+                {{ filter_form.book_type(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ filter_form.genre.label }}
+                {{ filter_form.genre(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ filter_form.sub_genre.label }}
+                {{ filter_form.sub_genre(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ filter_form.min_grade.label }}
+                {{ filter_form.min_grade(class="form-control", placeholder="1") }}
+            </div>
+            <div class="form-group">
+                {{ filter_form.max_grade.label }}
+                {{ filter_form.max_grade(class="form-control", placeholder="12") }}
+            </div>
+            <div class="form-group">
+                {{ filter_form.owned.label }}
+                {{ filter_form.owned(class="form-control") }}
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+            <a href="{{ url_for('student_reading_list') }}" class="btn btn-secondary">Clear</a>
+        </div>
+    </form>
+    {% if all_books %}
+        <div class="book-browse-grid">
+            {% for book in all_books %}
+                {% set in_list = reading_list|selectattr('book.id', 'equalto', book.id)|list|length > 0 %}
+                {% if not in_list %}
+                    <div class="book-browse-card">
+                        {% if book.cover_url %}
+                            <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="book-cover">
+                        {% else %}
+                            <div class="book-cover-placeholder">📚</div>
+                        {% endif %}
+                        <h4>{{ book.title }}</h4>
+                        {% if book.author %}
+                            <p class="author">{{ book.author }}</p>
+                        {% endif %}
+                        <div class="book-meta">
+                            {% if book.book_type %}<span class="badge">{{ book.book_type }}</span>{% endif %}
+                            {% if book.genre %}<span class="badge">{{ book.genre }}</span>{% endif %}
+                            {% if book.sub_genre %}<span class="badge">{{ book.sub_genre }}</span>{% endif %}
+                            {% if book.lexile_rating %}<span class="badge">{{ book.lexile_rating }}</span>{% endif %}
+                            {% if book.grade is not none %}<span class="badge">Grade {{ book.grade }}</span>{% endif %}
+                            {% if book.owned == 'Physical' %}<span class="badge" title="Available physically">📚 Physical</span>{% endif %}
+                            {% if book.owned == 'Kindle' %}<span class="badge" title="Available on Kindle">📱 Kindle</span>{% endif %}
+                        </div>
+                        <a href="{{ url_for('add_to_reading_list', book_id=book.id) }}" class="btn btn-sm btn-primary">Add to List</a>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No books available yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}{{ student.first_name }} {{ student.last_name }} - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>{{ student.first_name }} {{ student.last_name }}</h1>
+<p class="lead">{{ student.email }}</p>
+
+<div class="student-stats">
+    <div class="stat-card">
+        <h3>{{ books_read|length }}</h3>
+        <p>Books Read</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ reviews|length }}</h3>
+        <p>Reviews Written</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ reading_list|length }}</h3>
+        <p>Books in Reading List</p>
+    </div>
+</div>
+
+<div class="actions-bar">
+    <a href="{{ url_for('suggest_book', student_id=student.id) }}" class="btn btn-primary">Suggest a Book</a>
+</div>
+
+{% if books_read|length > 0 %}
+<div class="charts-section">
+    <h2>📊 Reading Statistics</h2>
+    <div class="charts-grid">
+        <div class="chart-container">
+            <h3>Fiction vs. Non-Fiction</h3>
+            <canvas id="typeChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3>Genres Read</h3>
+            <canvas id="genreChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3>Books by Grade Level</h3>
+            <canvas id="gradeChart"></canvas>
+        </div>
+    </div>
+</div>
+
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fiction vs. Non-Fiction Pie Chart
+    const typeCanvas = document.getElementById('typeChart');
+    if (typeCanvas) {
+        const typeCtx = typeCanvas.getContext('2d');
+        new Chart(typeCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Fiction', 'Non-Fiction'],
+                datasets: [{
+                    data: [{{ type_counts['Fiction'] }}, {{ type_counts['Non-Fiction'] }}],
+                    backgroundColor: ['#4a90e2', '#7b68ee']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Genre Pie Chart
+    const genreCanvas = document.getElementById('genreChart');
+    if (genreCanvas) {
+        const genreCtx = genreCanvas.getContext('2d');
+        new Chart(genreCtx, {
+            type: 'pie',
+            data: {
+                labels: {{ genre_counts.keys()|list|tojson|safe }},
+                datasets: [{
+                    data: {{ genre_counts.values()|list|tojson|safe }},
+                    backgroundColor: [
+                        '#4a90e2', '#7b68ee', '#2ecc71', '#e74c3c', '#f39c12',
+                        '#1abc9c', '#9b59b6', '#34495e', '#16a085', '#27ae60'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Grade Bar Chart
+    const gradeCanvas = document.getElementById('gradeChart');
+    if (gradeCanvas) {
+        const gradeCtx = gradeCanvas.getContext('2d');
+        const gradeLabels = {{ (grade_counts.keys()|list|map('string')|sort)|tojson|safe }};
+        const gradeCounts = {{ grade_counts|tojson|safe }};
+        const gradeData = gradeLabels.map(g => gradeCounts[g] || 0);
+        new Chart(gradeCtx, {
+            type: 'bar',
+            data: {
+                labels: gradeLabels.map(g => 'Grade ' + g),
+                datasets: [{
+                    label: 'Books Read',
+                    data: gradeData,
+                    backgroundColor: '#4a90e2'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endif %}
+
+<div class="section">
+    <h2>Books Read ({{ books_read|length }})</h2>
+    {% if books_read %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Genre</th>
+                    <th>Completed</th>
+                    <th>Review</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for br in books_read %}
+                    <tr>
+                        <td>{{ br.book.title }}</td>
+                        <td>{{ br.book.author or 'N/A' }}</td>
+                        <td>{{ br.book.genre or 'N/A' }}</td>
+                        <td>{{ br.completed_at.strftime('%B %d, %Y') }}</td>
+                        <td>
+                            {% set review = reviews|selectattr('book_id', 'equalto', br.book.id)|first %}
+                            {% if review %}
+                                <span class="rating">{{ '★' * review.rating|int }}{{ '☆' * (5 - review.rating|int) }}</span>
+                            {% else %}
+                                No review
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No books read yet.</p>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Reviews ({{ reviews|length }})</h2>
+    {% if reviews %}
+        {% for review in reviews %}
+            <div class="review-card">
+                <div class="review-header">
+                    <h3>{{ review.book.title }}</h3>
+                    <span class="rating">{{ '★' * review.rating|int }}{{ '☆' * (5 - review.rating|int) }}</span>
+                </div>
+                {% if review.what_liked %}
+                    <div class="review-section">
+                        <strong>What I liked:</strong>
+                        <p>{{ review.what_liked }}</p>
+                    </div>
+                {% endif %}
+                {% if review.favorite_part %}
+                    <div class="review-section">
+                        <strong>Favorite part:</strong>
+                        <p>{{ review.favorite_part }}</p>
+                    </div>
+                {% endif %}
+                {% if review.what_learned %}
+                    <div class="review-section">
+                        <strong>What I learned:</strong>
+                        <p>{{ review.what_learned }}</p>
+                    </div>
+                {% endif %}
+                {% if review.recommend_to %}
+                    <div class="review-section">
+                        <strong>I'd recommend this to:</strong>
+                        <p>{{ review.recommend_to }}</p>
+                    </div>
+                {% endif %}
+                <p class="review-date">{{ review.created_at.strftime('%B %d, %Y') }}</p>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No reviews yet.</p>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Reading List ({{ reading_list|length }})</h2>
+    {% if reading_list %}
+        <ol class="reading-list">
+            {% for item in reading_list %}
+                <li>
+                    <strong>{{ item.book.title }}</strong>
+                    {% if item.book.author %} by {{ item.book.author }}{% endif %}
+                </li>
+            {% endfor %}
+        </ol>
+    {% else %}
+        <p>Reading list is empty.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}{% if existing_review %}Edit{% else %}Write{% endif %} Review - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>{% if existing_review %}Edit{% else %}Write{% endif %} Review for {{ book.title }}</h1>
+
+{% if book.author %}
+    <p class="lead">by {{ book.author }}</p>
+{% endif %}
+
+<div class="book-meta mb-3">
+        {% if book.book_type %}<span class="badge">{{ book.book_type }}</span>{% endif %}
+        {% if book.genre %}<span class="badge">{{ book.genre }}</span>{% endif %}
+        {% if book.sub_genre %}<span class="badge">{{ book.sub_genre }}</span>{% endif %}
+    {% if book.lexile_rating %}<span class="badge">{{ book.lexile_rating }}</span>{% endif %}
+    {% if book.grade is not none %}<span class="badge">Grade {{ book.grade }}</span>{% endif %}
+    {% if book.owned == 'Physical' %}<span class="badge" title="Available physically">📚 Physical</span>{% endif %}
+    {% if book.owned == 'Kindle' %}<span class="badge" title="Available on Kindle">📱 Kindle</span>{% endif %}
+    {% if book.topic %}<span class="badge">{{ book.topic }}</span>{% endif %}
+        {% if book.publication_year %}<span class="badge">{{ book.publication_year }}</span>{% endif %}
+        {% if book.isbn %}<span class="badge">ISBN {{ book.isbn }}</span>{% endif %}
+    </div>
+
+<div class="form-container">
+    <form method="POST" action="{{ url_for('create_review', book_id=book.id) }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.rating.label }}
+            <div class="star-rating">
+                {% for i in range(5, 0, -1) %}
+                    <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}" {% if form.rating.data == i %}checked{% endif %} required>
+                    <label for="star{{ i }}">★</label>
+                {% endfor %}
+            </div>
+            {% if form.rating.errors %}
+                <div class="error">
+                    {% for error in form.rating.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.what_liked.label }}
+            {{ form.what_liked(class="form-control", rows="4", placeholder="What did you enjoy about this book?") }}
+        </div>
+        
+        <div class="form-group">
+            {{ form.favorite_part.label }}
+            {{ form.favorite_part(class="form-control", rows="4", placeholder="Describe your favorite scene or moment...") }}
+        </div>
+        
+        <div class="form-group">
+            {{ form.what_learned.label }}
+            {{ form.what_learned(class="form-control", rows="4", placeholder="Did you learn anything new or gain any insights?") }}
+        </div>
+        
+        <div class="form-group">
+            {{ form.recommend_to.label }}
+            {{ form.recommend_to(class="form-control", rows="3", placeholder="What kind of reader would enjoy this book?") }}
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{% if existing_review %}Update{% else %}Submit{% endif %} Review</button>
+            <a href="{{ url_for('books_read') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

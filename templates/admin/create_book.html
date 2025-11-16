@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Add Book - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>Add Book Manually</h1>
+
+<div class="form-container">
+    <form method="POST" action="{{ url_for('create_book') }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.title.label }}
+            {{ form.title(class="form-control") }}
+            {% if form.title.errors %}
+                <div class="error">
+                    {% for error in form.title.errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.author.label }}
+            {{ form.author(class="form-control") }}
+        </div>
+        
+        <div class="form-group">
+            {{ form.isbn.label }}
+            {{ form.isbn(class="form-control", placeholder="Will auto-fetch from OpenLibrary if provided") }}
+            <small class="form-text">If you provide an ISBN, we'll try to fetch book details from OpenLibrary</small>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                {{ form.book_type.label }}
+                {{ form.book_type(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.genre.label }}
+                {{ form.genre(class="form-control") }}
+            </div>
+            
+            <div class="form-group">
+                {{ form.topic.label }}
+                {{ form.topic(class="form-control") }}
+            </div>
+        </div>
+
+        <div class="form-group">
+            {{ form.sub_genre.label }}
+            {{ form.sub_genre(class="form-control", placeholder="e.g., Mystery, Biography, Historical Fiction") }}
+        </div>
+        
+        <div class="form-group">
+            {{ form.lexile_rating.label }}
+            {{ form.lexile_rating(class="form-control", placeholder="e.g., 750L") }}
+        </div>
+        
+        <div class="form-group">
+            {{ form.grade.label }}
+            {{ form.grade(class="form-control", placeholder="1-12") }}
+            <small class="form-text">Optional. Intended grade level (1-12).</small>
+        </div>
+        
+        <div class="form-group">
+            {{ form.owned.label }}
+            {{ form.owned(class="form-control") }}
+            <small class="form-text">Ownership status. Defaults to "Not Owned".</small>
+        </div>
+        
+        <div class="form-group">
+            {{ form.description.label }}
+            {{ form.description(class="form-control", rows="4") }}
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add Book</button>
+            <a href="{{ url_for('admin_books') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

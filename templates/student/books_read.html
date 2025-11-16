@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Books Read - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>✅ Books I've Read</h1>
+
+<form method="GET" action="{{ url_for('books_read') }}" class="filter-form">
+    <div class="form-row">
+        <div class="form-group">
+            {{ filter_form.search.label }}
+            {{ filter_form.search(class="form-control", placeholder="Search title or author") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.book_type.label }}
+            {{ filter_form.book_type(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.genre.label }}
+            {{ filter_form.genre(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.sub_genre.label }}
+            {{ filter_form.sub_genre(class="form-control") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.min_grade.label }}
+            {{ filter_form.min_grade(class="form-control", placeholder="1") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.max_grade.label }}
+            {{ filter_form.max_grade(class="form-control", placeholder="12") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.owned.label }}
+            {{ filter_form.owned(class="form-control") }}
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Apply Filters</button>
+        <a href="{{ url_for('books_read') }}" class="btn btn-secondary">Clear</a>
+    </div>
+ </form>
+
+{% if books_read %}
+    <p>You've read {{ books_read|length }} books!</p>
+    
+    <div class="books-read-grid">
+        {% for br in books_read %}
+            <div class="book-read-card">
+                {% if br.book.cover_url %}
+                    <img src="{{ br.book.cover_url }}" alt="{{ br.book.title }}" class="book-cover">
+                {% else %}
+                    <div class="book-cover-placeholder">📚</div>
+                {% endif %}
+                
+                <div class="book-details">
+                    <h3>{{ br.book.title }}</h3>
+                    {% if br.book.author %}
+                        <p class="author">by {{ br.book.author }}</p>
+                    {% endif %}
+                    
+                    <div class="book-meta">
+                        {% if br.book.book_type %}<span class="badge">{{ br.book.book_type }}</span>{% endif %}
+                        {% if br.book.genre %}<span class="badge">{{ br.book.genre }}</span>{% endif %}
+                        {% if br.book.sub_genre %}<span class="badge">{{ br.book.sub_genre }}</span>{% endif %}
+                        {% if br.book.lexile_rating %}<span class="badge">{{ br.book.lexile_rating }}</span>{% endif %}
+                        {% if br.book.grade is not none %}<span class="badge">Grade {{ br.book.grade }}</span>{% endif %}
+                        {% if br.book.owned == 'Physical' %}<span class="badge" title="Available physically">📚 Physical</span>{% endif %}
+                        {% if br.book.owned == 'Kindle' %}<span class="badge" title="Available on Kindle">📱 Kindle</span>{% endif %}
+                    </div>
+                    
+                    <p class="completed-date">Completed: {{ br.completed_at.strftime('%B %d, %Y') }}</p>
+                    
+                    {% set review = reviews.get(br.book.id) %}
+                    {% if review %}
+                        <div class="review-summary">
+                            <div class="rating">{{ '★' * review.rating }}{{ '☆' * (5 - review.rating) }}</div>
+                            {% if review.favorite_part %}
+                                <p class="review-snippet">{{ review.favorite_part[:100] }}{% if review.favorite_part|length > 100 %}...{% endif %}</p>
+                            {% endif %}
+                            <a href="{{ url_for('create_review', book_id=br.book.id) }}" class="btn btn-sm">Edit Review</a>
+                        </div>
+                    {% else %}
+                        <div class="no-review">
+                            <p>No review yet</p>
+                            <a href="{{ url_for('create_review', book_id=br.book.id) }}" class="btn btn-sm btn-primary">Write Review</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <p>You haven't marked any books as read yet.</p>
+        <p>Go to your <a href="{{ url_for('student_reading_list') }}">reading list</a> to mark books as read!</p>
+    </div>
+{% endif %}
+{% endblock %}
