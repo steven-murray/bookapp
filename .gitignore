@@ -38,9 +38,6 @@ htmlcov/
 .tox/
 .pytest_cache/
 
-# Dependency/lock files
-*.lock
-
 # Jupyter
 .ipynb_checkpoints/
 
@@ -54,6 +51,3 @@ node_modules/
 
 # Static assets
 static/__pycache__/
-
-# Ignore local settings
-config.py
