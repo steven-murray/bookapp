@@ -26,6 +26,11 @@
             {{ form.author(class="form-control") }}
         </div>
         
+        <div class="form-actions" style="margin: 0.5rem 0 1rem;">
+            <button type="button" class="btn btn-secondary" id="btn-enrich-ol">Guess from OpenLibrary</button>
+            <small id="enrich-status" class="form-text" style="margin-left: 0.5rem;"></small>
+        </div>
+        
         <div class="form-group">
             {{ form.isbn.label }}
             {{ form.isbn(class="form-control", placeholder="Will auto-fetch from OpenLibrary if provided") }}

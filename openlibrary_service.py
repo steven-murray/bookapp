@@ -7,13 +7,14 @@ class OpenLibraryService:
     BASE_URL = "https://openlibrary.org"
     
     @staticmethod
-    def search_books(query: str, limit: int = 10) -> list:
+    def search_books(query: str, fields: list[str] = (), limit: int = 10) -> list:
         """Search for books by title, author, or ISBN"""
         try:
             url = f"{OpenLibraryService.BASE_URL}/search.json"
             params = {
                 'q': query,
-                'limit': limit
+                'limit': limit,
+                'fields': ','.join(fields) if fields else None
             }
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
@@ -28,7 +29,7 @@ class OpenLibraryService:
                     'openlibrary_id': doc.get('key', ''),
                     'cover_id': doc.get('cover_i'),
                     'publication_year': doc.get('first_publish_year'),
-                    'publisher': ', '.join(doc.get('publisher', [])[:3]) if doc.get('publisher') else ''
+                    "subjects": doc.get('subject', [])
                 }
                 books.append(book)
             
@@ -72,7 +73,7 @@ class OpenLibraryService:
                     book['description'] = work_data.get('description', '')
                     if isinstance(book['description'], dict):
                         book['description'] = book['description'].get('value', '')
-                    subjects = work_data.get('subjects', []) or []
+                    subjects = work_data.get('subject', []) or []
                     # keep original behavior
                     book['genre'] = ', '.join(subjects[:3]) if subjects else ''
                     # also provide raw subjects for downstream inference

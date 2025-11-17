@@ -1,4 +1,5 @@
-from flask import Flask, render_template, redirect, url_for, flash, request, send_file
+import click
+from flask import Flask, render_template, redirect, url_for, flash, request, send_file, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
 from config import Config
@@ -6,7 +7,7 @@ from models import db, User, Class, Book, Review, BookRead, ReadingListItem, Sug
 from forms import (LoginForm, RegistrationForm, ClassForm, BookForm, CSVUploadForm, 
                    ReviewForm, SuggestBookForm, SearchBookForm, StudentBookFilterForm)
 from openlibrary_service import OpenLibraryService
-from book_import_service import BookImportService
+from book_import_service import BookImportService, enrich_book_from_openlibrary
 from datetime import datetime
 import io
 from sqlalchemy import or_
@@ -279,6 +280,36 @@ def create_book():
         return redirect(url_for('admin_books'))
     
     return render_template('admin/create_book.html', form=form)
+
+@app.route('/admin/book/enrich', methods=['POST'])
+@login_required
+@admin_required
+def enrich_book_from_title_author():
+    """Return best-guess fields from OpenLibrary based on provided title and author."""
+    data = request.get_json(silent=True) or request.form
+    title = (data.get('title') or '').strip()
+    author = (data.get('author') or '').strip()
+    isbn = (data.get('isbn') or '').strip() if 'isbn' in data else ''
+    if not title or not author:
+        return jsonify({'ok': False, 'error': 'Title and author are required'}), 400
+
+    # Create a temporary Book-like instance and enrich it
+    temp = Book(title=title, author=author, isbn=isbn or None)
+    try:
+        enrich_book_from_openlibrary(temp)
+        return jsonify({
+            'ok': True,
+            'title': temp.title,
+            'author': temp.author,
+            'book_type': temp.book_type,
+            'genre': temp.genre,
+            'sub_genre': temp.sub_genre,
+            'publication_year': temp.publication_year,
+            'openlibrary_id': temp.openlibrary_id,
+            'cover_url': getattr(temp, 'cover_url', None)
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/admin/book/<int:book_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -732,6 +763,13 @@ def init_db():
     print('Database initialized!')
 
 @app.cli.command()
+@click.argument("file_path")
+def process_csv(file_path):
+    """Process book CSV import."""
+    with open(file_path, 'r', encoding='utf-8') as fl:
+        result = BookImportService.import_from_csv(fl, debug=True)
+    
+@app.cli.command()
 def create_admin():
     """Create an admin user."""
     username = input('Username: ')
@@ -780,35 +818,20 @@ def upgrade_db():
     run_upgrade()
 
 @app.cli.command('enrich-missing-books')
-def enrich_missing_books():
+@click.option("--max", default=None, type=int, help="Maximum number of books to process")
+def enrich_missing_books(max: int):
     """Backfill book_type and sub_genre for books missing them using OpenLibrary subjects (requires ISBN)."""
     updated = 0
     books = Book.query.all()
-    for b in books:
-        if (b.book_type and b.sub_genre) or not b.isbn:
-            continue
-        ol_data = OpenLibraryService.get_book_by_isbn(b.isbn)
-        if not ol_data:
-            continue
-        subjects = ol_data.get('subjects') or []
-        lower_subjects = [s.lower() for s in subjects]
-        changed = False
-        if not b.book_type:
-            if any(('nonfiction' in s) or ('non-fiction' in s) for s in lower_subjects):
-                b.book_type = 'Non-Fiction'
-                changed = True
-            elif any('fiction' in s for s in lower_subjects):
-                b.book_type = 'Fiction'
-                changed = True
-        if not b.sub_genre and subjects:
-            preferred = next((s for s in subjects if 'fiction' not in s.lower() and 'non' not in s.lower()), None)
-            if preferred:
-                b.sub_genre = preferred
-                changed = True
-        if changed:
-            updated += 1
+    for ib, b in enumerate(books):
+        if max is not None and ib >= max:
+            break
+
+        updated += int(enrich_book_from_openlibrary(b))
+        
     if updated:
         db.session.commit()
+        
     print(f"Enriched {updated} book(s)")
 
 if __name__ == '__main__':

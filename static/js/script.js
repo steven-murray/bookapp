@@ -16,6 +16,53 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Rating selected:', this.value);
         });
     });
+    
+    // Enrich book fields from OpenLibrary on admin create form
+    const enrichBtn = document.getElementById('btn-enrich-ol');
+    if (enrichBtn) {
+        enrichBtn.addEventListener('click', async function() {
+            const statusEl = document.getElementById('enrich-status');
+            const titleInput = document.querySelector('input[name="title"]');
+            const authorInput = document.querySelector('input[name="author"]');
+            const isbnInput = document.querySelector('input[name="isbn"]');
+            if (!titleInput || !authorInput) return;
+
+            const title = (titleInput.value || '').trim();
+            const author = (authorInput.value || '').trim();
+            const isbn = isbnInput ? (isbnInput.value || '').trim() : '';
+            if (!title || !author) {
+                statusEl && (statusEl.textContent = 'Enter a title and author first');
+                return;
+            }
+            enrichBtn.disabled = true;
+            statusEl && (statusEl.textContent = 'Looking up suggestions…');
+            try {
+                const resp = await fetch('/admin/book/enrich', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, author, isbn })
+                });
+                const data = await resp.json();
+                if (!data.ok) throw new Error(data.error || 'Lookup failed');
+
+                // Populate fields if values returned
+                const setVal = (selector, value) => {
+                    const el = document.querySelector(selector);
+                    if (el && value != null && value !== '') { el.value = value; }
+                };
+                setVal('select[name="book_type"]', data.book_type || '');
+                setVal('input[name="genre"]', data.genre || '');
+                setVal('input[name="sub_genre"]', data.sub_genre || '');
+                // Description, topic, grade, lexile are not provided reliably by API; leave as-is
+                statusEl && (statusEl.textContent = 'Filled suggestions. Review before saving.');
+            } catch (e) {
+                console.error(e);
+                statusEl && (statusEl.textContent = 'Could not fetch suggestions.');
+            } finally {
+                enrichBtn.disabled = false;
+            }
+        });
+    }
 });
 
 // Confirmation dialogs
