@@ -791,11 +791,26 @@ def create_admin():
     print(f'Admin user {username} created successfully!')
 
 def run_upgrade():
-    """Lightweight DB upgrade: add new columns if missing (SQLite only)."""
-    # Check existing columns in 'book' table
-    result = db.session.execute(db.text("PRAGMA table_info(book)"))
-    existing_cols = {row[1] for row in result}
+    """Lightweight DB upgrade: create tables and add missing columns."""
+    # First, create all tables if they don't exist
+    db.create_all()
+    
+    # Then check for missing columns in the book table
+    # Use dialect-agnostic approach
+    from sqlalchemy import inspect
+    inspector = inspect(db.engine)
+    
+    # Check if book table exists
+    if 'book' not in inspector.get_table_names():
+        print('Database initialized with all tables.')
+        return
+    
+    existing_cols = {col['name'] for col in inspector.get_columns('book')}
     alters = []
+    
+    # Determine database type
+    dialect_name = db.engine.dialect.name
+    
     if 'book_type' not in existing_cols:
         alters.append("ALTER TABLE book ADD COLUMN book_type VARCHAR(20)")
     if 'sub_genre' not in existing_cols:
@@ -803,12 +818,20 @@ def run_upgrade():
     if 'grade' not in existing_cols:
         alters.append("ALTER TABLE book ADD COLUMN grade INTEGER")
     if 'owned' not in existing_cols:
-        alters.append("ALTER TABLE book ADD COLUMN owned VARCHAR(20) DEFAULT 'Not Owned'")
+        if dialect_name == 'sqlite':
+            alters.append("ALTER TABLE book ADD COLUMN owned VARCHAR(20) DEFAULT 'Not Owned'")
+        else:  # PostgreSQL
+            alters.append("ALTER TABLE book ADD COLUMN owned VARCHAR(20) DEFAULT 'Not Owned'")
+    
     for stmt in alters:
-        db.session.execute(db.text(stmt))
+        try:
+            db.session.execute(db.text(stmt))
+        except Exception as e:
+            print(f'Warning: {e}')
+    
     if alters:
         db.session.commit()
-        print('Database upgraded: added columns ->', ', '.join([s.split()[-1] if 'DEFAULT' not in s else s.split()[5] for s in alters]))
+        print('Database upgraded: added columns ->', ', '.join([s.split()[5] for s in alters]))
     else:
         print('Database already up to date.')
 

@@ -1,0 +1,58 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg
+*.eggs
+*.env
+.env
+.venv
+venv/
+ENV/
+env/
+
+# Database files
+*.db
+*.sqlite3
+*.sqlite
+
+# Flask instance
+instance/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Test/coverage
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+
+# Dependency lock files (include uv.lock in image)
+# uv.lock
+
+# Misc
+*.bak
+*.swp
+*.swo
+
+# Documentation
+*.md
+!README.md
+
+# Config samples
+.env.example
