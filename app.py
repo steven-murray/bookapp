@@ -554,9 +554,28 @@ def bulk_book_action():
     action = request.form.get('action')
     book_ids = request.form.getlist('book_ids')
     
+    # Collect filter parameters to preserve them
+    filter_params = {}
+    if request.form.get('search'):
+        filter_params['search'] = request.form.get('search')
+    if request.form.get('book_type'):
+        filter_params['book_type'] = request.form.get('book_type')
+    if request.form.get('genre'):
+        filter_params['genre'] = request.form.get('genre')
+    if request.form.get('sub_genre'):
+        filter_params['sub_genre'] = request.form.get('sub_genre')
+    if request.form.get('min_grade'):
+        filter_params['min_grade'] = request.form.get('min_grade')
+    if request.form.get('max_grade'):
+        filter_params['max_grade'] = request.form.get('max_grade')
+    if request.form.get('owned'):
+        filter_params['owned'] = request.form.get('owned')
+    if request.form.get('missing_olid'):
+        filter_params['missing_olid'] = '1'
+    
     if not book_ids:
         flash('No books selected.', 'warning')
-        return redirect(url_for('admin_books'))
+        return redirect(url_for('admin_books', **filter_params))
     
     book_ids = [int(bid) for bid in book_ids]
     
@@ -573,7 +592,7 @@ def bulk_book_action():
             if len(books_with_reviews) > 3:
                 msg += f" and {len(books_with_reviews) - 3} more"
             flash(msg, 'danger')
-            return redirect(url_for('admin_books'))
+            return redirect(url_for('admin_books', **filter_params))
         
         # Remove suggestions first
         SuggestedBook.query.filter(SuggestedBook.book_id.in_(book_ids)).delete(synchronize_session=False)
@@ -606,7 +625,7 @@ def bulk_book_action():
     else:
         flash('Invalid action.', 'danger')
     
-    return redirect(url_for('admin_books'))
+    return redirect(url_for('admin_books', **filter_params))
 
 @app.route('/admin/suggest_book/<int:student_id>', methods=['GET', 'POST'])
 @login_required

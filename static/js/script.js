@@ -1,5 +1,39 @@
-// Flash message auto-dismiss
+// Dark mode toggle
 document.addEventListener('DOMContentLoaded', function() {
+    // Dark mode initialization and toggle
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const htmlElement = document.documentElement;
+    
+    // Check for saved dark mode preference, default to light mode
+    const isDarkMode = localStorage.getItem('darkMode') === 'true';
+    if (isDarkMode) {
+        htmlElement.classList.add('dark-mode');
+        updateToggleButton();
+    }
+    
+    // Add click handler for toggle button
+    if (darkModeToggle) {
+        darkModeToggle.addEventListener('click', function() {
+            const isCurrentlyDark = htmlElement.classList.contains('dark-mode');
+            if (isCurrentlyDark) {
+                htmlElement.classList.remove('dark-mode');
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                htmlElement.classList.add('dark-mode');
+                localStorage.setItem('darkMode', 'true');
+            }
+            updateToggleButton();
+        });
+    }
+    
+    function updateToggleButton() {
+        const isCurrentlyDark = htmlElement.classList.contains('dark-mode');
+        if (darkModeToggle) {
+            darkModeToggle.textContent = isCurrentlyDark ? '☀️' : '🌙';
+            darkModeToggle.title = isCurrentlyDark ? 'Switch to light mode' : 'Switch to dark mode';
+        }
+    }
+    
     // Auto-dismiss flash messages after 5 seconds
     const alerts = document.querySelectorAll('.alert');
     alerts.forEach(alert => {

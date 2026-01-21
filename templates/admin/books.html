@@ -66,6 +66,16 @@
     <p>Total books: {{ books|length }}</p>
     
     <form method="POST" action="{{ url_for('bulk_book_action') }}" id="bulkActionForm">
+        <!-- Preserve filter parameters -->
+        {% if filter_form.search.data %}<input type="hidden" name="search" value="{{ filter_form.search.data }}">{% endif %}
+        {% if filter_form.book_type.data %}<input type="hidden" name="book_type" value="{{ filter_form.book_type.data }}">{% endif %}
+        {% if filter_form.genre.data %}<input type="hidden" name="genre" value="{{ filter_form.genre.data }}">{% endif %}
+        {% if filter_form.sub_genre.data %}<input type="hidden" name="sub_genre" value="{{ filter_form.sub_genre.data }}">{% endif %}
+        {% if filter_form.min_grade.data is not none %}<input type="hidden" name="min_grade" value="{{ filter_form.min_grade.data }}">{% endif %}
+        {% if filter_form.max_grade.data is not none %}<input type="hidden" name="max_grade" value="{{ filter_form.max_grade.data }}">{% endif %}
+        {% if filter_form.owned.data %}<input type="hidden" name="owned" value="{{ filter_form.owned.data }}">{% endif %}
+        {% if filter_form.missing_olid.data %}<input type="hidden" name="missing_olid" value="1">{% endif %}
+        
         <div class="bulk-actions-bar">
             <label>
                 <input type="checkbox" id="selectAll"> Select All
@@ -79,16 +89,16 @@
                 <option value="set_owned">Set Owned Status</option>
             </select>
             
-            <div id="typeOptions" style="display: none; display: inline-block;">
-                <select name="book_type" class="form-control" style="width: auto;">
+            <div id="typeOptions" style="display: none;">
+                <select name="book_type" class="form-control" style="width: auto; display: inline-block;">
                     <option value="">Select Type</option>
                     <option value="Fiction">Fiction</option>
                     <option value="Non-Fiction">Non-Fiction</option>
                 </select>
             </div>
             
-            <div id="ownedOptions" style="display: none; display: inline-block;">
-                <select name="owned" class="form-control" style="width: auto;">
+            <div id="ownedOptions" style="display: none;">
+                <select name="owned" class="form-control" style="width: auto; display: inline-block;">
                     <option value="">Select Status</option>
                     <option value="Physical">Physical</option>
                     <option value="Kindle">Kindle</option>
@@ -96,8 +106,8 @@
                 </select>
             </div>
             
-            <div id="genreOptions" style="display: none; display: inline-block;">
-                <input type="text" name="genre" class="form-control" placeholder="Enter genre" style="width: 200px;">
+            <div id="genreOptions" style="display: none;">
+                <input type="text" name="genre" class="form-control" placeholder="Enter genre" style="width: 200px; display: inline-block;">
             </div>
             
             <button type="submit" class="btn btn-primary" onclick="return confirmBulkAction()">Apply</button>
@@ -300,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .bulk-actions-bar {
     margin: 20px 0;
     padding: 15px;
-    background: #f5f5f5;
+    background: var(--light-gray);
     border-radius: 5px;
     display: flex;
     align-items: center;

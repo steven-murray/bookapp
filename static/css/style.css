@@ -7,6 +7,7 @@
 
 :root {
     --primary-color: #4a90e2;
+    --link-color: #0066cc;
     --secondary-color: #7b68ee;
     --success-color: #2ecc71;
     --danger-color: #e74c3c;
@@ -17,13 +18,28 @@
     --dark-gray: #6c757d;
     --text-color: #333;
     --border-color: #dee2e6;
+    --bg-color: white;
+    --surface-color: white;
+}
+
+:root.dark-mode {
+    --primary-color: #64b5f6;
+    --link-color: #64b5f6;
+    --text-color: #e4e4e4;
+    --light-gray: #2a2a2a;
+    --medium-gray: #3a3a3a;
+    --dark-gray: #999;
+    --border-color: #444;
+    --bg-color: #1a1a1a;
+    --surface-color: #242424;
 }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     line-height: 1.6;
     color: var(--text-color);
-    background-color: var(--light-gray);
+    background-color: var(--bg-color);
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .container {
@@ -32,9 +48,27 @@ body {
     padding: 0 20px;
 }
 
+/* Links */
+a {
+    color: var(--link-color);
+    transition: color 0.3s;
+}
+
+a:hover {
+    color: var(--primary-color);
+}
+
+a:visited {
+    color: var(--link-color);
+}
+
+a.btn, a.btn:hover, a.btn:visited {
+    color: white;
+}
+
 /* Navigation */
 .navbar {
-    background-color: white;
+    background-color: var(--surface-color);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     padding: 1rem 0;
     margin-bottom: 2rem;
@@ -109,6 +143,7 @@ h3 {
     transition: all 0.3s;
     font-size: 1rem;
     text-align: center;
+    color: white;
 }
 
 .btn-primary {
@@ -118,6 +153,7 @@ h3 {
 
 .btn-primary:hover {
     background-color: #357abd;
+    color: white;
 }
 
 .btn-secondary {
@@ -127,6 +163,7 @@ h3 {
 
 .btn-secondary:hover {
     background-color: #5a6268;
+    color: white;
 }
 
 .btn-success {
@@ -136,6 +173,7 @@ h3 {
 
 .btn-success:hover {
     background-color: #27ae60;
+    color: white;
 }
 
 .btn-danger {
@@ -145,6 +183,7 @@ h3 {
 
 .btn-danger:hover {
     background-color: #c0392b;
+    color: white;
 }
 
 .btn-sm {
@@ -201,7 +240,7 @@ h3 {
 
 /* Forms */
 .form-container {
-    background: white;
+    background: var(--surface-color);
     padding: 2rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -260,7 +299,7 @@ h3 {
 .hero {
     text-align: center;
     padding: 3rem 0;
-    background: white;
+    background: var(--surface-color);
     border-radius: 8px;
     margin-bottom: 2rem;
 }
@@ -290,7 +329,7 @@ h3 {
 }
 
 .feature-card {
-    background: white;
+    background: var(--surface-color);
     padding: 2rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -317,7 +356,7 @@ h3 {
 }
 
 .stat-card {
-    background: white;
+    background: var(--surface-color);
     padding: 1.5rem;
     border-radius: 8px;
     text-align: center;
@@ -336,7 +375,7 @@ h3 {
 
 /* Charts Section */
 .charts-section {
-    background: white;
+    background: var(--surface-color);
     padding: 2rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -379,7 +418,7 @@ h3 {
 }
 
 .section {
-    background: white;
+    background: var(--surface-color);
     padding: 2rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -401,7 +440,7 @@ h3 {
 }
 
 .class-card {
-    background: white;
+    background: var(--surface-color);
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -433,7 +472,7 @@ h3 {
     width: 100%;
     border-collapse: collapse;
     margin-top: 1rem;
-    background: white;
+    background: var(--surface-color);
 }
 
 .data-table th,
@@ -516,7 +555,7 @@ a[href*="openlibrary.org"] {
 }
 
 .book-card, .book-browse-card {
-    background: white;
+    background: var(--surface-color);
     padding: 1rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -556,7 +595,7 @@ a[href*="openlibrary.org"] {
 }
 
 .reading-list-item {
-    background: white;
+    background: var(--surface-color);
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -615,7 +654,7 @@ a[href*="openlibrary.org"] {
 }
 
 .book-read-card {
-    background: white;
+    background: var(--surface-color);
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -643,7 +682,7 @@ a[href*="openlibrary.org"] {
 
 /* Reviews */
 .review-card, .review-card-preview {
-    background: white;
+    background: var(--surface-color);
     padding: 1.5rem;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -723,7 +762,7 @@ a[href*="openlibrary.org"] {
 
 /* Suggestions */
 .suggestions-section {
-    background: #fff9e6;
+    background: var(--surface-color);
     padding: 2rem;
     border-radius: 8px;
     margin-bottom: 2rem;
@@ -825,13 +864,13 @@ a[href*="openlibrary.org"] {
 .empty-state {
     text-align: center;
     padding: 3rem;
-    background: white;
+    background: var(--surface-color);
     border-radius: 8px;
 }
 
 /* Footer */
 .footer {
-    background-color: white;
+    background-color: var(--surface-color);
     padding: 2rem 0;
     margin-top: 3rem;
     text-align: center;
@@ -865,7 +904,7 @@ a[href*="openlibrary.org"] {
 }
 
 .modal-content {
-    background-color: white;
+    background-color: var(--surface-color);
     margin: 10% auto;
     padding: 30px;
     border-radius: 8px;
@@ -1075,4 +1114,19 @@ a[href*="openlibrary.org"] {
     .item-content {
         flex-direction: column;
     }
+}
+
+/* Dark Mode Toggle */
+.dark-mode-toggle {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.2s;
+    padding: 0.25rem;
+}
+
+.dark-mode-toggle:hover {
+    transform: scale(1.1);
 }

@@ -200,7 +200,7 @@ function switchTab(tabName) {
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
-    background: white;
+    background: var(--surface-color);
 }
 
 .suggestion-header {
@@ -239,8 +239,9 @@ function switchTab(tabName) {
 }
 
 .suggested-value {
-    background-color: #ffffcc;
+    background-color: var(--light-gray);
     font-weight: bold;
+    color: var(--success-color);
 }
 
 .suggestion-actions {
@@ -250,12 +251,12 @@ function switchTab(tabName) {
 }
 
 .badge-success {
-    background-color: #28a745;
+    background-color: var(--success-color);
     color: white;
 }
 
 .badge-danger {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
     color: white;
 }
 </style>
