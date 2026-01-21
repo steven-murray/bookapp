@@ -3,76 +3,57 @@ import io
 import re
 from models import Book, db
 from openlibrary_service import OpenLibraryService
-from sqlalchemy import func
+from csv_cli import CSVBookRecord, select_best_work, WorkWrapper
+import attrs
 
-def enrich_book_from_openlibrary(b: Book) -> bool:
-    if (b.book_type and b.genre and b.sub_genre and b.publication_year and b.cover_url and b.openlibrary_id):
-        return False
+def book_to_csvbookrecord(b: Book) -> CSVBookRecord:
+    """Convert a Book object to a CSV row dict"""
+    fields = attrs.fields(CSVBookRecord)
+    return CSVBookRecord(**{k.name: getattr(b, k.name) for k in fields})
     
+    
+def enrich_book_from_openlibrary(b: Book) -> bool:
+    """Enrich a Book object with data from OpenLibrary."""
+    record = book_to_csvbookrecord(b)
+    if not record.enrichable():
+        return False
+        
     try:
-        ol_data = OpenLibraryService.search_books(
-            f"author:{b.author} title:{b.title}",
-            fields=['author_name', 'title', 'subject', 'key', 'first_publish_year'], 
+        print("ABOUT TO SEARCH")
+        results = OpenLibraryService.search_books(
+            f"{b.title} {b.author}",
+            fields=['key', 'title', 'subject', 'first_publish_year', 'cover_i'], 
             limit=1
-        )[0]
+        )
+        print("DONE SEARCH")
+        if not results:
+            print(f"No OpenLibrary results found for '{b.title}' by {b.author}")
+            return False
+            
+        ol_data = results[0]
     except Exception as e:
         print(f"OpenLibrary lookup failed for {b.author} {b.title}: {e}")
         return False
 
     print(f"Processing book: {b.title} by {b.author}.")
-    print(f"  > OpenLibrary data: {ol_data}")
     
-    KNOWN_GENRES = [
-        'Fantasy', 'Science Fiction', 'Mystery', 'Romance', 'Historical Fiction', 
-        'Biography', 'Self-Help', 'Adventure', 'Horror', 'Thriller',
-        'History', 'Science', 'Poetry', 'Drama', 'Children\'s Fiction', 'Young Adult'
-    ]
-    subjects = ol_data.get('subjects') or []
-    lower_subjects = [s.lower() for s in subjects]
+    record = record.update_from_openlibrary_work(
+        WorkWrapper(ol_data, ask=False), quick=True
+    )
+    print(record)
     changed = False
-    if not b.book_type:
-        if any(('nonfiction' in s) or ('non-fiction' in s) or ('non fiction' in s) for s in lower_subjects):
-            b.book_type = 'Non-Fiction'
+    for k in attrs.fields(CSVBookRecord):
+        old_value = getattr(b, k.name)
+        new_value = getattr(record, k.name)
+        if old_value != new_value:
+            setattr(b, k.name, new_value)
             changed = True
-        elif 'fiction' in lower_subjects:
-            b.book_type = 'Fiction'
-            changed = True
-
-    if not b.genre:
-        for s in lower_subjects:
-            if s in [g.lower() for g in KNOWN_GENRES]:
-                b.genre = s.title()
-                changed = True
-                break
-            
-    if not b.sub_genre and subjects:
-        preferred = next((s for s in subjects if 'fiction' not in s.lower() and 'non' not in s.lower()), None)
-        if preferred:
-            b.sub_genre = preferred
-            changed = True
-    
-    if not b.publication_year:
-        pub_year = ol_data.get('publication_year')
-        if pub_year:
-            b.publication_year = pub_year
-            changed = True
-    # Try setting cover if available from search result
-    if not getattr(b, 'cover_url', None):
-        cover_id = ol_data.get('cover_id')
-        if cover_id:
-            b.cover_url = OpenLibraryService.get_cover_url(cover_id=cover_id, size='L')
-            changed = True
-            
-    if not b.openlibrary_id:
-        ol_id = ol_data.get('openlibrary_id')
-        if ol_id:
-            b.openlibrary_id = ol_id
-            changed = True
-            
+    print("CHANGED?", changed)   
     if changed:
         print(f"  >> Updated book: type={b.book_type}, genre={b.genre}, sub_genre={b.sub_genre}, publication_year={b.publication_year}")
         
     return changed
+
 class BookImportService:
     """Service for importing books from CSV files"""
     
@@ -90,10 +71,16 @@ class BookImportService:
         return normalized
     
     @staticmethod
-    def import_from_csv(csv_file, debug: bool = False) -> dict:
+    def import_from_csv(csv_file, debug: bool = False, skip_enrichment: bool = False) -> dict:
         """
         Import books from CSV file
-    Expected CSV format: title, author, isbn, book_type, genre, sub_genre, topic, lexile_rating, grade, owned
+        Expected CSV format: title, author, book_type, genre, sub_genre, topic, lexile_rating, grade, owned
+        
+        Args:
+            csv_file: File object or file handle
+            debug: Print debug messages
+            skip_enrichment: If True, skip OpenLibrary enrichment (faster)
+        
         Returns dict with success count and errors
         """
         result = {
@@ -140,72 +127,63 @@ class BookImportService:
                             print(f"Debug: Skipping existing book '{title_raw}' by '{author_raw}'")
                         continue
                     
-                    isbn = row.get('isbn', '').strip()
-                    # Create book from CSV data
-                    # Parse grade
-                    grade_val = None
-                    grade_raw = (row.get('grade') or '').strip()
-                    if grade_raw:
-                        try:
-                            grade_val = int(grade_raw)
-                        except ValueError:
-                            raise ValueError(f"Invalid grade '{grade_raw}'")
-                        if grade_val < 1 or grade_val > 12:
-                            raise ValueError(f"Grade must be between 1 and 12 (got {grade_val})")
-
-                    # Parse owned
-                    owned_val = (row.get('owned') or '').strip() or 'Not Owned'
-                    if owned_val not in ['Physical', 'Kindle', 'Not Owned']:
-                        raise ValueError(f"Invalid owned value '{owned_val}' (must be Physical, Kindle, or Not Owned)")
+                    record = CSVBookRecord.from_dict(row)
+                    if not skip_enrichment and record.enrichable():
+                        works = OpenLibraryService.author_title_search(title=record.title, author=record.author, fields="all", limit=1)
+                        work = select_best_work(works)
+                        record.update_from_openlibrary_work(work, quick=True, ask=False)
 
                     book = Book(
-                        title=row.get('title', '').strip(),
-                        author=row.get('author', '').strip(),
-                        isbn=isbn if isbn else None,
-                        book_type=row.get('book_type', '').strip() or None,
-                        genre=row.get('genre', '').strip(),
-                        sub_genre=row.get('sub_genre', '').strip() or None,
-                        topic=row.get('topic', '').strip(),
-                        lexile_rating=row.get('lexile_rating', '').strip(),
-                        grade=grade_val,
-                        owned=owned_val
+                        title=record.title,
+                        author=record.author,
+                        book_type=record.book_type,
+                        genre=record.genre,
+                        sub_genre=record.sub_genre,
+                        topic=record.topic,
+                        lexile_rating=record.lexile_rating,
+                        grade=record.grade,
+                        owned=record.owned,
+                        openlibrary_id=record.openlibrary_id,
+                        description=record.description,
+                        cover_url=record.cover_url,
+                        publication_year=record.publication_year
                     )
-                    # Try to enrich from OpenLibrary if ISBN is provided
-                    if isbn:
-                        try:
-                            ol_data = OpenLibraryService.get_book_by_isbn(isbn)
-                        except Exception as e:
-                            # Continue even if OpenLibrary lookup fails
-                            print(f"OpenLibrary lookup failed for {isbn}: {e}")
+                    # # Try to enrich from OpenLibrary if ISBN is provided
+                    # if isbn:
+                    #     try:
+                    #         ol_data = OpenLibraryService.get_book_by_isbn(isbn)
+                    #     except Exception as e:
+                    #         # Continue even if OpenLibrary lookup fails
+                    #         print(f"OpenLibrary lookup failed for {isbn}: {e}")
 
-                        if ol_data:
-                            if not book.title:
-                                book.title = ol_data.get('title', '')
-                            if not book.author:
-                                book.author = ol_data.get('author', '')
-                            book.openlibrary_id = ol_data.get('openlibrary_id', '')
-                            book.description = ol_data.get('description', '')
-                            book.cover_url = ol_data.get('cover_url', '')
-                            book.publication_year = ol_data.get('publication_year')
-                            # Don't override genre/topic from CSV if they exist
-                            if not book.genre and ol_data.get('genre'):
-                                book.genre = ol_data.get('genre', '')
+                    #     if ol_data:
+                    #         if not book.title:
+                    #             book.title = ol_data.get('title', '')
+                    #         if not book.author:
+                    #             book.author = ol_data.get('author', '')
+                    #         book.openlibrary_id = ol_data.get('openlibrary_id', '')
+                    #         book.description = ol_data.get('description', '')
+                    #         book.cover_url = ol_data.get('cover_url', '')
+                    #         book.publication_year = ol_data.get('publication_year')
+                    #         # Don't override genre/topic from CSV if they exist
+                    #         if not book.genre and ol_data.get('genre'):
+                    #             book.genre = ol_data.get('genre', '')
 
-                    else:
-                        enrich_book_from_openlibrary(book)
-                    
-            
-                    # Validate required fields
-                    if not book.title:
-                        result['errors'].append(f"Row {row_num}: Title is required")
-                        result['error_count'] += 1
-                        continue
+                    # else:
+                    #     enrich_book_from_openlibrary(book)
                     
                     if not debug:
-                        db.session.add(book)
+                        try:
+                            db.session.add(book)
+                            db.session.flush()  # Check for constraint violations before commit
+                            result['success_count'] += 1
+                        except Exception as add_error:
+                            db.session.rollback()
+                            result['errors'].append(f"Row {row_num}: Failed to add book - {str(add_error)}")
+                            result['error_count'] += 1
                     else:
                         print(f"Debug: Would add book: {book}")
-                    result['success_count'] += 1
+                        result['success_count'] += 1
                     
                 except Exception as e:
                     if debug:
@@ -229,10 +207,10 @@ class BookImportService:
     def create_sample_csv() -> str:
         """Generate sample CSV content for download"""
         sample_data = [
-            ['title', 'author', 'isbn', 'book_type', 'genre', 'sub_genre', 'topic', 'lexile_rating', 'grade', 'owned'],
-            ['The Hunger Games', 'Suzanne Collins', '9780439023481', 'Fiction', 'Science Fiction', 'Dystopian', 'Courage', '810L', '7', 'Physical'],
-            ['Wonder', 'R.J. Palacio', '9780375869020', 'Fiction', 'Realistic Fiction', 'School Life', 'Kindness', '790L', '5', 'Kindle'],
-            ['I Am Malala', 'Malala Yousafzai', '9780316322423', 'Non-Fiction', 'Biography', 'Memoir', 'Activism', '1000L', '8', 'Not Owned']
+            ['title', 'author', 'book_type', 'genre', 'sub_genre', 'topic', 'lexile_rating', 'grade', 'owned'],
+            ['The Hunger Games', 'Suzanne Collins', 'Fiction', 'Science Fiction', 'Dystopian', 'Courage', '810L', '7', 'Physical'],
+            ['Wonder', 'R.J. Palacio', 'Fiction', 'Realistic Fiction', 'School Life', 'Kindness', '790L', '5', 'Kindle'],
+            ['I Am Malala', 'Malala Yousafzai', 'Non-Fiction', 'Biography', 'Memoir', 'Activism', '1000L', '8', 'Not Owned']
         ]
         
         output = io.StringIO()

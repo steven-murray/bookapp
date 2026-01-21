@@ -11,7 +11,6 @@
     <ul>
         <li><strong>title</strong> (required): Book title</li>
         <li><strong>author</strong>: Author name</li>
-        <li><strong>isbn</strong>: ISBN (will fetch additional data from OpenLibrary)</li>
         <li><strong>genre</strong>: Book genre</li>
         <li><strong>topic</strong>: Book topic/subject</li>
         <li><strong>lexile_rating</strong>: Lexile rating (e.g., 750L)</li>
@@ -33,6 +32,14 @@
                     {% endfor %}
                 </div>
             {% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label>
+                {{ form.skip_enrichment() }}
+                {{ form.skip_enrichment.label.text }}
+            </label>
+            <p class="form-hint">Check this to skip automatic enrichment from OpenLibrary. This will make the import much faster but won't auto-fill missing metadata.</p>
         </div>
         
         <div class="form-actions">

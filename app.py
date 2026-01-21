@@ -3,9 +3,9 @@ from flask import Flask, render_template, redirect, url_for, flash, request, sen
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
 from config import Config
-from models import db, User, Class, Book, Review, BookRead, ReadingListItem, SuggestedBook
+from models import db, User, Class, Book, Review, BookRead, ReadingListItem, SuggestedBook, BookSuggestion, BookEditSuggestion, Genre, SubGenre, Topic, GenreMap
 from forms import (LoginForm, RegistrationForm, ClassForm, BookForm, CSVUploadForm, 
-                   ReviewForm, SuggestBookForm, SearchBookForm, StudentBookFilterForm)
+                   ReviewForm, SuggestBookForm, SearchBookForm, StudentBookFilterForm, BookSuggestionForm)
 from openlibrary_service import OpenLibraryService
 from book_import_service import BookImportService, enrich_book_from_openlibrary
 from datetime import datetime
@@ -24,6 +24,12 @@ login_manager.login_view = 'login'
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+# Custom Jinja filter to remove page parameter from request args
+@app.template_filter('reject_page')
+def reject_page_filter(args_dict):
+    """Remove 'page' from query args dict"""
+    return {k: v for k, v in args_dict.items() if k != 'page'}
 
 # Decorator for admin-only routes
 def admin_required(f):
@@ -101,11 +107,39 @@ def admin_dashboard():
     total_books = Book.query.count()
     recent_reviews = Review.query.order_by(Review.created_at.desc()).limit(5).all()
     
+    # Find books in reading lists that are not owned
+    # Get all unique book IDs from reading lists
+    reading_list_book_ids = db.session.query(ReadingListItem.book_id).distinct().all()
+    reading_list_book_ids = [book_id[0] for book_id in reading_list_book_ids]
+    
+    # Query books that are in reading lists and not owned
+    books_needed = Book.query.filter(
+        Book.id.in_(reading_list_book_ids),
+        Book.owned == 'Not Owned'
+    ).all()
+    
+    # Count how many students have each book in their reading list
+    books_needed_with_counts = []
+    for book in books_needed:
+        student_count = ReadingListItem.query.filter_by(book_id=book.id).count()
+        books_needed_with_counts.append({
+            'book': book,
+            'student_count': student_count
+        })
+    
+    # Sort by student count (descending)
+    books_needed_with_counts.sort(key=lambda x: x['student_count'], reverse=True)
+    
+    # Count pending book suggestions from students
+    pending_suggestions = BookSuggestion.query.filter_by(status='pending').count()
+    
     return render_template('admin/dashboard.html', 
                          classes=classes,
                          total_students=total_students,
                          total_books=total_books,
-                         recent_reviews=recent_reviews)
+                         recent_reviews=recent_reviews,
+                         books_needed=books_needed_with_counts,
+                         pending_suggestions=pending_suggestions)
 
 @app.route('/admin/classes')
 @login_required
@@ -227,8 +261,46 @@ def view_student(student_id):
 @admin_required
 def admin_books():
     search_form = SearchBookForm()
-    books = Book.query.all()
-    return render_template('admin/books.html', books=books, search_form=search_form)
+    
+    # Build filter form with dynamic choices
+    filter_form = StudentBookFilterForm(request.args)
+    # Populate genre/sub-genre choices dynamically from DB
+    genres = [g[0] for g in db.session.query(Book.genre).distinct() if g[0]]
+    sub_genres = [sg[0] for sg in db.session.query(Book.sub_genre).distinct() if sg[0]]
+    filter_form.genre.choices = [('', 'Any'), ('__not_set__', 'Not Set')] + [(g, g) for g in sorted(genres)]
+    filter_form.sub_genre.choices = [('', 'Any'), ('__not_set__', 'Not Set')] + [(sg, sg) for sg in sorted(sub_genres)]
+
+    # Apply filters
+    query = Book.query
+    if filter_form.book_type.data:
+        if filter_form.book_type.data == '__not_set__':
+            query = query.filter(or_(Book.book_type == None, Book.book_type == ''))
+        else:
+            query = query.filter(Book.book_type == filter_form.book_type.data)
+    if filter_form.genre.data:
+        if filter_form.genre.data == '__not_set__':
+            query = query.filter(or_(Book.genre == None, Book.genre == ''))
+        else:
+            query = query.filter(Book.genre == filter_form.genre.data)
+    if filter_form.sub_genre.data:
+        if filter_form.sub_genre.data == '__not_set__':
+            query = query.filter(or_(Book.sub_genre == None, Book.sub_genre == ''))
+        else:
+            query = query.filter(Book.sub_genre == filter_form.sub_genre.data)
+    if filter_form.min_grade.data is not None:
+        query = query.filter(Book.grade >= filter_form.min_grade.data)
+    if filter_form.max_grade.data is not None:
+        query = query.filter(Book.grade <= filter_form.max_grade.data)
+    if filter_form.owned.data:
+        query = query.filter(Book.owned == filter_form.owned.data)
+    if filter_form.search.data:
+        term = f"%{filter_form.search.data.strip()}%"
+        query = query.filter(or_(Book.title.ilike(term), Book.author.ilike(term)))
+    if filter_form.missing_olid.data:
+        query = query.filter(or_(Book.openlibrary_id == None, Book.openlibrary_id == ''))
+
+    books = query.all()
+    return render_template('admin/books.html', books=books, search_form=search_form, filter_form=filter_form)
 
 @app.route('/admin/book/create', methods=['GET', 'POST'])
 @login_required
@@ -236,10 +308,21 @@ def admin_books():
 def create_book():
     form = BookForm()
     if form.validate_on_submit():
+        # Check if book with same author and title already exists
+        existing_book = Book.query.filter_by(
+            author=form.author.data,
+            title=form.title.data
+        ).first()
+        
+        if existing_book:
+            flash(f'A book titled "{form.title.data}" by {form.author.data} already exists in the library.', 'danger')
+            return render_template('admin/create_book.html', form=form)
+        
         book = Book(
             title=form.title.data,
             author=form.author.data,
-            isbn=form.isbn.data,
+            openlibrary_id=form.openlibrary_id.data or None,
+            publication_year=form.publication_year.data if form.publication_year.data is not None else None,
             book_type=form.book_type.data or None,
             sub_genre=form.sub_genre.data or None,
             genre=form.genre.data,
@@ -250,34 +333,15 @@ def create_book():
             description=form.description.data
         )
         
-        # Try to enrich from OpenLibrary if ISBN provided
-        if book.isbn:
-            ol_data = OpenLibraryService.get_book_by_isbn(book.isbn)
-            if ol_data:
-                if not book.title:
-                    book.title = ol_data.get('title', '')
-                if not book.author:
-                    book.author = ol_data.get('author', '')
-                book.openlibrary_id = ol_data.get('openlibrary_id', '')
-                book.cover_url = ol_data.get('cover_url', '')
-                book.publication_year = ol_data.get('publication_year')
-                # Infer type/sub-genre when not provided from the form
-                subjects = ol_data.get('subjects') or []
-                lower_subjects = [s.lower() for s in subjects]
-                if not book.book_type:
-                    if any(('nonfiction' in s) or ('non-fiction' in s) for s in lower_subjects):
-                        book.book_type = 'Non-Fiction'
-                    elif any('fiction' in s for s in lower_subjects):
-                        book.book_type = 'Fiction'
-                if not book.sub_genre and subjects:
-                    preferred = next((s for s in subjects if 'fiction' not in s.lower() and 'non' not in s.lower()), None)
-                    if preferred:
-                        book.sub_genre = preferred
-        
-        db.session.add(book)
-        db.session.commit()
-        flash('Book added successfully!', 'success')
-        return redirect(url_for('admin_books'))
+        try:
+            db.session.add(book)
+            db.session.commit()
+            flash('Book added successfully!', 'success')
+            return redirect(url_for('admin_books'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding book: {str(e)}', 'danger')
+            return render_template('admin/create_book.html', form=form)
     
     return render_template('admin/create_book.html', form=form)
 
@@ -286,17 +350,19 @@ def create_book():
 @admin_required
 def enrich_book_from_title_author():
     """Return best-guess fields from OpenLibrary based on provided title and author."""
+    print("ENRICHING BOOK")
     data = request.get_json(silent=True) or request.form
     title = (data.get('title') or '').strip()
     author = (data.get('author') or '').strip()
-    isbn = (data.get('isbn') or '').strip() if 'isbn' in data else ''
     if not title or not author:
         return jsonify({'ok': False, 'error': 'Title and author are required'}), 400
 
     # Create a temporary Book-like instance and enrich it
-    temp = Book(title=title, author=author, isbn=isbn or None)
+    temp = Book(title=title, author=author)
+    print("MADE BOOK")
     try:
         enrich_book_from_openlibrary(temp)
+        print("HERE IS WHAT I GOT", temp)
         return jsonify({
             'ok': True,
             'title': temp.title,
@@ -309,6 +375,7 @@ def enrich_book_from_title_author():
             'cover_url': getattr(temp, 'cover_url', None)
         })
     except Exception as e:
+        print(e)
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/admin/book/<int:book_id>/edit', methods=['GET', 'POST'])
@@ -319,18 +386,22 @@ def edit_book(book_id):
     form = BookForm()
 
     if form.validate_on_submit():
-        # Unique ISBN check if changed
-        new_isbn = form.isbn.data.strip() if form.isbn.data else None
-        if new_isbn and new_isbn != (book.isbn or None):
-            exists = Book.query.filter(Book.isbn == new_isbn, Book.id != book.id).first()
-            if exists:
-                flash('Another book with this ISBN already exists.', 'danger')
-                return render_template('admin/edit_book.html', form=form, book=book)
-
+        # Check if another book with same author and title exists (excluding current book)
+        duplicate = Book.query.filter(
+            Book.author == form.author.data,
+            Book.title == form.title.data,
+            Book.id != book.id
+        ).first()
+        
+        if duplicate:
+            flash(f'Another book titled "{form.title.data}" by {form.author.data} already exists.', 'danger')
+            return render_template('admin/edit_book.html', form=form, book=book)
+        
         # Update fields
         book.title = form.title.data
         book.author = form.author.data or None
-        book.isbn = new_isbn
+        book.openlibrary_id = form.openlibrary_id.data or None
+        book.publication_year = form.publication_year.data if form.publication_year.data is not None else None
         book.book_type = form.book_type.data or None
         book.sub_genre = form.sub_genre.data or None
         book.genre = form.genre.data or None
@@ -340,15 +411,21 @@ def edit_book(book_id):
         book.owned = form.owned.data or 'Not Owned'
         book.description = form.description.data or None
 
-        db.session.commit()
-        flash('Book updated successfully!', 'success')
-        return redirect(url_for('admin_books'))
+        try:
+            db.session.commit()
+            flash('Book updated successfully!', 'success')
+            return redirect(url_for('admin_books'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating book: {str(e)}', 'danger')
+            return render_template('admin/edit_book.html', form=form, book=book)
 
     # Pre-fill form with current values
     if request.method == 'GET':
         form.title.data = book.title
         form.author.data = book.author
-        form.isbn.data = book.isbn
+        form.openlibrary_id.data = book.openlibrary_id
+        form.publication_year.data = book.publication_year
         form.book_type.data = book.book_type
         form.sub_genre.data = book.sub_genre
         form.genre.data = book.genre
@@ -366,7 +443,10 @@ def edit_book(book_id):
 def upload_books():
     form = CSVUploadForm()
     if form.validate_on_submit():
-        result = BookImportService.import_from_csv(form.csv_file.data)
+        result = BookImportService.import_from_csv(
+            form.csv_file.data, 
+            skip_enrichment=form.skip_enrichment.data
+        )
         
         if result['success_count'] > 0:
             flash(f"Successfully imported {result['success_count']} books!", 'success')
@@ -408,23 +488,27 @@ def search_openlibrary():
 def add_book_from_openlibrary():
     title = request.form.get('title')
     author = request.form.get('author')
-    isbn = request.form.get('isbn')
     openlibrary_id = request.form.get('openlibrary_id')
     cover_id = request.form.get('cover_id')
     publication_year = request.form.get('publication_year')
     
-    # Check if book already exists by ISBN
-    if isbn:
-        existing_book = Book.query.filter_by(isbn=isbn).first()
+    # Check if book already exists by openlibrary_id or author+title
+    if openlibrary_id:
+        existing_book = Book.query.filter_by(openlibrary_id=openlibrary_id).first()
         if existing_book:
             flash(f'Book "{title}" already exists in the library.', 'info')
             return redirect(url_for('admin_books'))
+    
+    # Also check by author and title
+    existing_book = Book.query.filter_by(author=author, title=title).first()
+    if existing_book:
+        flash(f'Book "{title}" by {author} already exists in the library.', 'info')
+        return redirect(url_for('admin_books'))
     
     # Create new book
     book = Book(
         title=title,
         author=author,
-        isbn=isbn if isbn else None,
         openlibrary_id=openlibrary_id if openlibrary_id else None,
         publication_year=int(publication_year) if publication_year and publication_year != 'None' else None
     )
@@ -433,30 +517,13 @@ def add_book_from_openlibrary():
     if cover_id and cover_id != 'None':
         book.cover_url = f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
     
-    # Try to get additional details from OpenLibrary if ISBN is available
-    if isbn and isbn != 'None':
-        ol_data = OpenLibraryService.get_book_by_isbn(isbn)
-        if ol_data:
-            if not book.description:
-                book.description = ol_data.get('description', '')
-            if not book.genre:
-                book.genre = ol_data.get('genre', '')
-            # Infer book_type and sub_genre from OpenLibrary subjects, when possible
-            subjects = ol_data.get('subjects') or []
-            lower_subjects = [s.lower() for s in subjects]
-            if not book.book_type:
-                if any(('nonfiction' in s) or ('non-fiction' in s) for s in lower_subjects):
-                    book.book_type = 'Non-Fiction'
-                elif any('fiction' in s for s in lower_subjects):
-                    book.book_type = 'Fiction'
-            if not book.sub_genre and subjects:
-                # choose the first subject that isn't a generic fiction/nonfiction label
-                preferred = next((s for s in subjects if 'fiction' not in s.lower() and 'non' not in s.lower()), None)
-                if preferred:
-                    book.sub_genre = preferred
-    
-    db.session.add(book)
-    db.session.commit()
+    try:
+        db.session.add(book)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error adding book: {str(e)}', 'danger')
+        return redirect(url_for('admin_books'))
     
     flash(f'Book "{title}" added to library successfully!', 'success')
     return redirect(url_for('admin_books'))
@@ -467,12 +534,78 @@ def add_book_from_openlibrary():
 def delete_book(book_id):
     book = Book.query.get_or_404(book_id)
     
+    # Check if book has reviews
+    if book.has_reviews():
+        flash(f'Cannot delete "{book.title}" - this book has student reviews.', 'danger')
+        return redirect(url_for('admin_books'))
+    
     # Remove suggestions referencing this book to avoid FK issues
     SuggestedBook.query.filter_by(book_id=book_id).delete(synchronize_session=False)
     
     db.session.delete(book)
     db.session.commit()
     flash('Book deleted successfully!', 'success')
+    return redirect(url_for('admin_books'))
+
+@app.route('/admin/books/bulk-action', methods=['POST'])
+@login_required
+@admin_required
+def bulk_book_action():
+    action = request.form.get('action')
+    book_ids = request.form.getlist('book_ids')
+    
+    if not book_ids:
+        flash('No books selected.', 'warning')
+        return redirect(url_for('admin_books'))
+    
+    book_ids = [int(bid) for bid in book_ids]
+    
+    if action == 'delete':
+        # Check if any selected books have reviews
+        books_with_reviews = Book.query.filter(
+            Book.id.in_(book_ids),
+            Book.reviews.any()
+        ).all()
+        
+        if books_with_reviews:
+            titles = [b.title for b in books_with_reviews[:3]]
+            msg = f"Cannot delete {len(books_with_reviews)} book(s) with student reviews: {', '.join(titles)}"
+            if len(books_with_reviews) > 3:
+                msg += f" and {len(books_with_reviews) - 3} more"
+            flash(msg, 'danger')
+            return redirect(url_for('admin_books'))
+        
+        # Remove suggestions first
+        SuggestedBook.query.filter(SuggestedBook.book_id.in_(book_ids)).delete(synchronize_session=False)
+        # Delete books
+        Book.query.filter(Book.id.in_(book_ids)).delete(synchronize_session=False)
+        db.session.commit()
+        flash(f'{len(book_ids)} book(s) deleted successfully!', 'success')
+    
+    elif action == 'set_type':
+        book_type = request.form.get('book_type')
+        if book_type:
+            Book.query.filter(Book.id.in_(book_ids)).update({'book_type': book_type}, synchronize_session=False)
+            db.session.commit()
+            flash(f'{len(book_ids)} book(s) updated to type "{book_type}".', 'success')
+    
+    elif action == 'set_owned':
+        owned = request.form.get('owned')
+        if owned:
+            Book.query.filter(Book.id.in_(book_ids)).update({'owned': owned}, synchronize_session=False)
+            db.session.commit()
+            flash(f'{len(book_ids)} book(s) updated to owned status "{owned}".', 'success')
+    
+    elif action == 'set_genre':
+        genre = request.form.get('genre')
+        if genre:
+            Book.query.filter(Book.id.in_(book_ids)).update({'genre': genre}, synchronize_session=False)
+            db.session.commit()
+            flash(f'{len(book_ids)} book(s) updated to genre "{genre}".', 'success')
+    
+    else:
+        flash('Invalid action.', 'danger')
+    
     return redirect(url_for('admin_books'))
 
 @app.route('/admin/suggest_book/<int:student_id>', methods=['GET', 'POST'])
@@ -557,6 +690,10 @@ def student_reading_list():
     filter_form.genre.choices = [('', 'Any')] + [(g, g) for g in sorted(genres)]
     filter_form.sub_genre.choices = [('', 'Any')] + [(sg, sg) for sg in sorted(sub_genres)]
 
+    # Get page number from query params
+    page = request.args.get('page', 1, type=int)
+    per_page = 20
+
     # Apply filters to browseable books
     query = Book.query
     if filter_form.book_type.data:
@@ -575,9 +712,23 @@ def student_reading_list():
         term = f"%{filter_form.search.data.strip()}%"
         query = query.filter(or_(Book.title.ilike(term), Book.author.ilike(term)))
 
-    all_books = [b for b in query.all() if b.id not in read_book_ids]
+    # Filter out books already read
+    all_books_filtered = [b for b in query.all() if b.id not in read_book_ids]
+    
+    # Calculate pagination
+    total_books = len(all_books_filtered)
+    total_pages = (total_books + per_page - 1) // per_page  # Ceiling division
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    all_books = all_books_filtered[start_idx:end_idx]
 
-    return render_template('student/reading_list.html', reading_list=reading_list, all_books=all_books, filter_form=filter_form)
+    return render_template('student/reading_list.html', 
+                          reading_list=reading_list, 
+                          all_books=all_books, 
+                          filter_form=filter_form,
+                          page=page,
+                          total_pages=total_pages,
+                          total_books=total_books)
 
 @app.route('/student/add_to_reading_list/<int:book_id>')
 @login_required
@@ -755,6 +906,237 @@ def accept_suggestion(suggestion_id):
     flash('Book added to your reading list!', 'success')
     return redirect(url_for('student_dashboard'))
 
+@app.route('/student/suggest_new_book', methods=['GET', 'POST'])
+@login_required
+def student_suggest_new_book():
+    if current_user.is_admin():
+        return redirect(url_for('admin_dashboard'))
+    
+    form = BookSuggestionForm()
+    if form.validate_on_submit():
+        # Check if book already exists in library
+        existing_book = Book.query.filter_by(
+            author=form.author.data,
+            title=form.title.data
+        ).first()
+        
+        if existing_book:
+            flash(f'"{form.title.data}" by {form.author.data} is already in the library!', 'info')
+            return redirect(url_for('student_reading_list'))
+        
+        # Check if student already suggested this book
+        existing_suggestion = BookSuggestion.query.filter_by(
+            student_id=current_user.id,
+            author=form.author.data,
+            title=form.title.data,
+            status='pending'
+        ).first()
+        
+        if existing_suggestion:
+            flash('You have already suggested this book. It is pending review.', 'info')
+            return redirect(url_for('student_suggest_new_book'))
+        
+        # Create new suggestion
+        suggestion = BookSuggestion(
+            student_id=current_user.id,
+            title=form.title.data,
+            author=form.author.data,
+            reason=form.reason.data
+        )
+        db.session.add(suggestion)
+        db.session.commit()
+        
+        flash(f'Thank you for suggesting "{form.title.data}"! Your teacher will review it.', 'success')
+        return redirect(url_for('student_dashboard'))
+    
+    # Get student's previous suggestions
+    my_suggestions = BookSuggestion.query.filter_by(student_id=current_user.id).order_by(BookSuggestion.suggested_at.desc()).all()
+    
+    return render_template('student/suggest_new_book.html', form=form, my_suggestions=my_suggestions)
+
+@app.route('/admin/book_suggestions')
+@login_required
+@admin_required
+def admin_book_suggestions():
+    # Get all pending suggestions
+    pending = BookSuggestion.query.filter_by(status='pending').order_by(BookSuggestion.suggested_at.desc()).all()
+    # Get recently reviewed suggestions
+    reviewed = BookSuggestion.query.filter(BookSuggestion.status.in_(['approved', 'rejected', 'added'])).order_by(BookSuggestion.reviewed_at.desc()).limit(20).all()
+    
+    return render_template('admin/book_suggestions.html', pending=pending, reviewed=reviewed)
+
+@app.route('/admin/book_suggestion/<int:suggestion_id>/review', methods=['POST'])
+@login_required
+@admin_required
+def review_book_suggestion(suggestion_id):
+    suggestion = BookSuggestion.query.get_or_404(suggestion_id)
+    action = request.form.get('action')
+    admin_notes = request.form.get('admin_notes', '')
+    
+    if action == 'approve':
+        suggestion.status = 'approved'
+        suggestion.reviewed_by_id = current_user.id
+        suggestion.reviewed_at = datetime.utcnow()
+        suggestion.admin_notes = admin_notes
+        db.session.commit()
+        flash(f'Approved suggestion for "{suggestion.title}". You can now add it to the library.', 'success')
+    
+    elif action == 'reject':
+        suggestion.status = 'rejected'
+        suggestion.reviewed_by_id = current_user.id
+        suggestion.reviewed_at = datetime.utcnow()
+        suggestion.admin_notes = admin_notes
+        db.session.commit()
+        flash(f'Rejected suggestion for "{suggestion.title}".', 'info')
+    
+    elif action == 'add':
+        # Create the book and mark suggestion as added
+        existing_book = Book.query.filter_by(author=suggestion.author, title=suggestion.title).first()
+        
+        if existing_book:
+            flash(f'Book already exists in library!', 'warning')
+            suggestion.book_id = existing_book.id
+            suggestion.status = 'added'
+        else:
+            # Create book with basic info
+            book = Book(
+                title=suggestion.title,
+                author=suggestion.author,
+                description=f"Suggested by {suggestion.student.first_name} {suggestion.student.last_name}"
+            )
+            
+            # Try to enrich from OpenLibrary
+            try:
+                enrich_book_from_openlibrary(book)
+                flash(f'Added "{suggestion.title}" to the library with OpenLibrary metadata!', 'success')
+            except Exception as e:
+                # If enrichment fails, still add the book
+                flash(f'Added "{suggestion.title}" to the library (OpenLibrary lookup failed).', 'success')
+            
+            db.session.add(book)
+            db.session.flush()
+            
+            suggestion.book_id = book.id
+            suggestion.status = 'added'
+            suggestion.reviewed_by_id = current_user.id
+            suggestion.reviewed_at = datetime.utcnow()
+            suggestion.admin_notes = admin_notes
+        
+        db.session.commit()
+    
+    return redirect(url_for('admin_book_suggestions'))
+
+# Student: Suggest Edit to Book
+@app.route('/student/book/<int:book_id>/suggest-edit', methods=['POST'])
+@login_required
+def suggest_book_edit(book_id):
+    if current_user.role != 'student':
+        flash('Only students can suggest edits.', 'danger')
+        return redirect(url_for('index'))
+    
+    book = Book.query.get_or_404(book_id)
+    data = request.get_json()
+    
+    # Create edit suggestion with only changed fields
+    suggestion = BookEditSuggestion(
+        book_id=book_id,
+        student_id=current_user.id,
+        reason=data.get('reason', '')
+    )
+    
+    # Only set fields that are different from current values
+    if data.get('title') and data.get('title') != book.title:
+        suggestion.suggested_title = data.get('title')
+    if data.get('author') and data.get('author') != book.author:
+        suggestion.suggested_author = data.get('author')
+    if data.get('openlibrary_id') and data.get('openlibrary_id') != book.openlibrary_id:
+        suggestion.suggested_openlibrary_id = data.get('openlibrary_id')
+    if data.get('publication_year') and data.get('publication_year') != book.publication_year:
+        suggestion.suggested_publication_year = data.get('publication_year')
+    if data.get('book_type') and data.get('book_type') != book.book_type:
+        suggestion.suggested_book_type = data.get('book_type')
+    if data.get('genre') and data.get('genre') != book.genre:
+        suggestion.suggested_genre = data.get('genre')
+    if data.get('sub_genre') and data.get('sub_genre') != book.sub_genre:
+        suggestion.suggested_sub_genre = data.get('sub_genre')
+    if data.get('topic') and data.get('topic') != book.topic:
+        suggestion.suggested_topic = data.get('topic')
+    if data.get('lexile_rating') and data.get('lexile_rating') != book.lexile_rating:
+        suggestion.suggested_lexile_rating = data.get('lexile_rating')
+    if data.get('grade') and data.get('grade') != book.grade:
+        suggestion.suggested_grade = data.get('grade')
+    if data.get('description') and data.get('description') != book.description:
+        suggestion.suggested_description = data.get('description')
+    
+    try:
+        db.session.add(suggestion)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Edit suggestion submitted successfully!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Admin: View Book Edit Suggestions
+@app.route('/admin/book-edit-suggestions')
+@login_required
+@admin_required
+def admin_book_edit_suggestions():
+    pending = BookEditSuggestion.query.filter_by(status='pending').order_by(BookEditSuggestion.suggested_at.desc()).all()
+    reviewed = BookEditSuggestion.query.filter(BookEditSuggestion.status.in_(['approved', 'rejected'])).order_by(BookEditSuggestion.reviewed_at.desc()).limit(20).all()
+    return render_template('admin/book_edit_suggestions.html', pending=pending, reviewed=reviewed)
+
+# Admin: Review Book Edit Suggestion
+@app.route('/admin/book-edit-suggestion/<int:suggestion_id>/review', methods=['POST'])
+@login_required
+@admin_required
+def review_book_edit_suggestion(suggestion_id):
+    suggestion = BookEditSuggestion.query.get_or_404(suggestion_id)
+    action = request.form.get('action')
+    admin_notes = request.form.get('admin_notes', '')
+    
+    if action == 'approve':
+        # Apply the suggested changes to the book
+        book = suggestion.book
+        if suggestion.suggested_title:
+            book.title = suggestion.suggested_title
+        if suggestion.suggested_author:
+            book.author = suggestion.suggested_author
+        if suggestion.suggested_openlibrary_id:
+            book.openlibrary_id = suggestion.suggested_openlibrary_id
+        if suggestion.suggested_publication_year:
+            book.publication_year = suggestion.suggested_publication_year
+        if suggestion.suggested_book_type:
+            book.book_type = suggestion.suggested_book_type
+        if suggestion.suggested_genre:
+            book.genre = suggestion.suggested_genre
+        if suggestion.suggested_sub_genre:
+            book.sub_genre = suggestion.suggested_sub_genre
+        if suggestion.suggested_topic:
+            book.topic = suggestion.suggested_topic
+        if suggestion.suggested_lexile_rating:
+            book.lexile_rating = suggestion.suggested_lexile_rating
+        if suggestion.suggested_grade:
+            book.grade = suggestion.suggested_grade
+        if suggestion.suggested_description:
+            book.description = suggestion.suggested_description
+        
+        suggestion.status = 'approved'
+        suggestion.reviewed_by_id = current_user.id
+        suggestion.reviewed_at = datetime.utcnow()
+        suggestion.admin_notes = admin_notes
+        db.session.commit()
+        flash(f'Approved edits for "{book.title}"!', 'success')
+    
+    elif action == 'reject':
+        suggestion.status = 'rejected'
+        suggestion.reviewed_by_id = current_user.id
+        suggestion.reviewed_at = datetime.utcnow()
+        suggestion.admin_notes = admin_notes
+        db.session.commit()
+        flash('Edit suggestion rejected.', 'info')
+    
+    return redirect(url_for('admin_book_edit_suggestions'))
+
 # Initialize database
 @app.cli.command()
 def init_db():
@@ -856,6 +1238,243 @@ def enrich_missing_books(max: int):
         db.session.commit()
         
     print(f"Enriched {updated} book(s)")
+
+
+# Routes for managing genres, sub-genres, topics, and genre maps
+@app.route('/admin/genres')
+@login_required
+@admin_required
+def admin_genres():
+    genres = Genre.query.order_by(Genre.book_type, Genre.name).all()
+    topics = Topic.query.order_by(Topic.name).all()
+    genre_maps = GenreMap.query.order_by(GenreMap.alternative_name).all()
+    
+    return render_template('admin/genres.html',
+                          genres=genres,
+                          topics=topics,
+                          genre_maps=genre_maps)
+
+
+@app.route('/admin/genre/add', methods=['POST'])
+@login_required
+@admin_required
+def add_genre():
+    book_type = request.form.get('book_type')
+    name = request.form.get('name')
+    
+    if not book_type or not name:
+        flash('Book type and genre name are required.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    # Check if genre already exists
+    existing = Genre.query.filter_by(book_type=book_type, name=name).first()
+    if existing:
+        flash(f'Genre "{name}" already exists for {book_type}.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    genre = Genre(book_type=book_type, name=name)
+    db.session.add(genre)
+    db.session.commit()
+    
+    flash(f'Genre "{name}" added successfully!', 'success')
+    return redirect(url_for('admin_genres'))
+
+
+@app.route('/admin/genre/<int:genre_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_genre(genre_id):
+    genre = Genre.query.get_or_404(genre_id)
+    
+    # Check if any books use this genre
+    books_with_genre = Book.query.filter_by(genre=genre.name).count()
+    if books_with_genre > 0:
+        flash(f'Cannot delete genre "{genre.name}" because {books_with_genre} book(s) use it.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    db.session.delete(genre)
+    db.session.commit()
+    
+    flash(f'Genre "{genre.name}" deleted successfully!', 'success')
+    return redirect(url_for('admin_genres'))
+
+
+@app.route('/admin/subgenre/add', methods=['POST'])
+@login_required
+@admin_required
+def add_subgenre():
+    genre_id = request.form.get('genre_id')
+    name = request.form.get('name')
+    
+    if not genre_id or not name:
+        flash('Genre and sub-genre name are required.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    genre = Genre.query.get_or_404(genre_id)
+    
+    # Check if sub-genre already exists for this genre
+    existing = SubGenre.query.filter_by(genre_id=genre_id, name=name).first()
+    if existing:
+        flash(f'Sub-genre "{name}" already exists for {genre.name}.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    subgenre = SubGenre(genre_id=genre_id, name=name)
+    db.session.add(subgenre)
+    db.session.commit()
+    
+    flash(f'Sub-genre "{name}" added successfully!', 'success')
+    return redirect(url_for('admin_genres'))
+
+
+@app.route('/admin/subgenre/<int:subgenre_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_subgenre(subgenre_id):
+    subgenre = SubGenre.query.get_or_404(subgenre_id)
+    
+    # Check if any books use this sub-genre
+    books_with_subgenre = Book.query.filter_by(sub_genre=subgenre.name).count()
+    if books_with_subgenre > 0:
+        flash(f'Cannot delete sub-genre "{subgenre.name}" because {books_with_subgenre} book(s) use it.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    db.session.delete(subgenre)
+    db.session.commit()
+    
+    flash(f'Sub-genre "{subgenre.name}" deleted successfully!', 'success')
+    return redirect(url_for('admin_genres'))
+
+
+@app.route('/admin/topic/add', methods=['POST'])
+@login_required
+@admin_required
+def add_topic():
+    name = request.form.get('name')
+    
+    if not name:
+        flash('Topic name is required.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    # Check if topic already exists
+    existing = Topic.query.filter_by(name=name).first()
+    if existing:
+        flash(f'Topic "{name}" already exists.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    topic = Topic(name=name)
+    db.session.add(topic)
+    db.session.commit()
+    
+    flash(f'Topic "{name}" added successfully!', 'success')
+    return redirect(url_for('admin_genres'))
+
+
+@app.route('/admin/topic/<int:topic_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_topic(topic_id):
+    topic = Topic.query.get_or_404(topic_id)
+    
+    # Check if any books use this topic
+    books_with_topic = Book.query.filter_by(topic=topic.name).count()
+    if books_with_topic > 0:
+        flash(f'Cannot delete topic "{topic.name}" because {books_with_topic} book(s) use it.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    db.session.delete(topic)
+    db.session.commit()
+    
+    flash(f'Topic "{topic.name}" deleted successfully!', 'success')
+    return redirect(url_for('admin_genres'))
+
+
+@app.route('/admin/genremap/add', methods=['POST'])
+@login_required
+@admin_required
+def add_genre_map():
+    alternative_name = request.form.get('alternative_name')
+    canonical_name = request.form.get('canonical_name')
+    
+    if not alternative_name or not canonical_name:
+        flash('Both alternative name and canonical name are required.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    # Check if mapping already exists
+    existing = GenreMap.query.filter_by(alternative_name=alternative_name).first()
+    if existing:
+        flash(f'Mapping for "{alternative_name}" already exists.', 'danger')
+        return redirect(url_for('admin_genres'))
+    
+    genre_map = GenreMap(alternative_name=alternative_name, canonical_name=canonical_name)
+    db.session.add(genre_map)
+    db.session.commit()
+    
+    flash(f'Genre mapping added successfully!', 'success')
+    return redirect(url_for('admin_genres'))
+
+
+@app.route('/admin/genremap/<int:map_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_genre_map(map_id):
+    genre_map = GenreMap.query.get_or_404(map_id)
+    
+    db.session.delete(genre_map)
+    db.session.commit()
+    
+    flash(f'Genre mapping deleted successfully!', 'success')
+    return redirect(url_for('admin_genres'))
+
+
+@app.route('/api/genres/<book_type>')
+def api_get_genres(book_type):
+    """API endpoint to get genres for a given book type"""
+    if book_type not in ['Fiction', 'Non-Fiction']:
+        return jsonify([])
+    
+    genres = Genre.query.filter_by(book_type=book_type).order_by(Genre.name).all()
+    return jsonify([{'id': g.id, 'name': g.name} for g in genres])
+
+
+@app.route('/api/subgenres/<int:genre_id>')
+def api_get_subgenres(genre_id):
+    """API endpoint to get sub-genres for a given genre"""
+    genre = Genre.query.get_or_404(genre_id)
+    subgenres = SubGenre.query.filter_by(genre_id=genre_id).order_by(SubGenre.name).all()
+    return jsonify([{'id': sg.id, 'name': sg.name} for sg in subgenres])
+
+
+@app.route('/api/subgenres-by-name/<book_type>/<genre_name>')
+def api_get_subgenres_by_name(book_type, genre_name):
+    """API endpoint to get sub-genres by book type and genre name"""
+    genre = Genre.query.filter_by(book_type=book_type, name=genre_name).first()
+    if not genre:
+        return jsonify([])
+    
+    subgenres = SubGenre.query.filter_by(genre_id=genre.id).order_by(SubGenre.name).all()
+    return jsonify([{'id': sg.id, 'name': sg.name} for sg in subgenres])
+
+@app.route('/api/fetch-openlibrary-metadata', methods=['POST'])
+@login_required
+@admin_required
+def fetch_openlibrary_metadata():
+    """Fetch metadata from OpenLibrary by work ID"""
+    from csv_cli import CSVBookRecord
+    
+    data = request.get_json()
+    olid = data.get('openlibrary_id', '').strip()
+    
+    if not olid:
+        return jsonify({'error': 'OpenLibrary ID is required'}), 400
+        
+    try:
+        record = CSVBookRecord.from_openlibrary_id(olid, ask=False, quick=True)
+        return jsonify(record.asdict())
+    
+    except Exception as e:
+        print(f"Error fetching OpenLibrary metadata: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True)

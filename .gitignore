@@ -51,3 +51,10 @@ node_modules/
 
 # Static assets
 static/__pycache__/
+raw_book_list_full.csv
+raw_book_list_full.csv
+enriched-more.csv
+.gitignore
+goodreads_library_export.csv
+enriched.csv
+testdata/

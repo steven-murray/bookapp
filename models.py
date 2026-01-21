@@ -74,10 +74,13 @@ class Class(db.Model):
 
 
 class Book(db.Model):
+    __table_args__ = (
+        db.UniqueConstraint('author', 'title', name='uq_author_title'),
+    )
+    
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     author = db.Column(db.String(200))
-    isbn = db.Column(db.String(13), unique=True)
     openlibrary_id = db.Column(db.String(50))
     # New metadata
     book_type = db.Column(db.String(20))  # 'Fiction' or 'Non-Fiction'
@@ -99,6 +102,10 @@ class Book(db.Model):
                                 cascade='all, delete-orphan')
     reviews = db.relationship('Review', back_populates='book',
                              cascade='all, delete-orphan')
+    
+    def has_reviews(self):
+        """Check if this book has any student reviews"""
+        return len(self.reviews) > 0
     
     def __repr__(self):
         return f'<Book {self.title}>'
@@ -170,3 +177,114 @@ class SuggestedBook(db.Model):
     
     def __repr__(self):
         return f'<SuggestedBook Student:{self.student_id} Book:{self.book_id}>'
+
+
+class BookSuggestion(db.Model):
+    """Students suggesting new books to be added to the library"""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    author = db.Column(db.String(200), nullable=False)
+    reason = db.Column(db.Text)  # Why the student wants this book
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'approved', 'rejected', 'added'
+    suggested_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime)
+    reviewed_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    admin_notes = db.Column(db.Text)  # Admin's notes on the suggestion
+    book_id = db.Column(db.Integer, db.ForeignKey('book.id'))  # Set when book is added to library
+    
+    # Relationships
+    student = db.relationship('User', foreign_keys=[student_id])
+    reviewed_by = db.relationship('User', foreign_keys=[reviewed_by_id])
+    book = db.relationship('Book')
+    
+    def __repr__(self):
+        return f'<BookSuggestion "{self.title}" by {self.author} from Student:{self.student_id}>'
+
+
+class BookEditSuggestion(db.Model):
+    """Students suggesting edits to existing books"""
+    id = db.Column(db.Integer, primary_key=True)
+    book_id = db.Column(db.Integer, db.ForeignKey('book.id'), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Suggested changes (NULL means no change suggested)
+    suggested_title = db.Column(db.String(200))
+    suggested_author = db.Column(db.String(200))
+    suggested_openlibrary_id = db.Column(db.String(50))
+    suggested_publication_year = db.Column(db.Integer)
+    suggested_book_type = db.Column(db.String(20))
+    suggested_genre = db.Column(db.String(100))
+    suggested_sub_genre = db.Column(db.String(100))
+    suggested_topic = db.Column(db.String(100))
+    suggested_lexile_rating = db.Column(db.String(20))
+    suggested_grade = db.Column(db.Integer)
+    suggested_description = db.Column(db.Text)
+    
+    reason = db.Column(db.Text)  # Why the student is suggesting these changes
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'approved', 'rejected'
+    suggested_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reviewed_at = db.Column(db.DateTime)
+    reviewed_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    admin_notes = db.Column(db.Text)
+    
+    # Relationships
+    book = db.relationship('Book')
+    student = db.relationship('User', foreign_keys=[student_id])
+    reviewed_by = db.relationship('User', foreign_keys=[reviewed_by_id])
+    
+    def __repr__(self):
+        return f'<BookEditSuggestion for Book:{self.book_id} from Student:{self.student_id}>'
+
+
+class Genre(db.Model):
+    """Allowed genres organized by book type (Fiction/Non-Fiction)"""
+    id = db.Column(db.Integer, primary_key=True)
+    book_type = db.Column(db.String(20), nullable=False)  # 'Fiction' or 'Non-Fiction'
+    name = db.Column(db.String(100), nullable=False)
+    
+    # Relationships
+    sub_genres = db.relationship('SubGenre', back_populates='genre', cascade='all, delete-orphan')
+    
+    __table_args__ = (
+        db.UniqueConstraint('book_type', 'name', name='uq_book_type_genre'),
+    )
+    
+    def __repr__(self):
+        return f'<Genre {self.book_type}:{self.name}>'
+
+
+class SubGenre(db.Model):
+    """Allowed sub-genres for each genre"""
+    id = db.Column(db.Integer, primary_key=True)
+    genre_id = db.Column(db.Integer, db.ForeignKey('genre.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    
+    # Relationships
+    genre = db.relationship('Genre', back_populates='sub_genres')
+    
+    __table_args__ = (
+        db.UniqueConstraint('genre_id', 'name', name='uq_genre_subgenre'),
+    )
+    
+    def __repr__(self):
+        return f'<SubGenre {self.name}>'
+
+
+class Topic(db.Model):
+    """Allowed topics for books"""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False, unique=True)
+    
+    def __repr__(self):
+        return f'<Topic {self.name}>'
+
+
+class GenreMap(db.Model):
+    """Mappings from alternative genre names to canonical genre names"""
+    id = db.Column(db.Integer, primary_key=True)
+    alternative_name = db.Column(db.String(100), nullable=False, unique=True)
+    canonical_name = db.Column(db.String(100), nullable=False)
+    
+    def __repr__(self):
+        return f'<GenreMap {self.alternative_name} -> {self.canonical_name}>'

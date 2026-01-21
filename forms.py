@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, PasswordField, TextAreaField, SelectField, IntegerField, HiddenField
+from wtforms import StringField, PasswordField, TextAreaField, SelectField, IntegerField, HiddenField, BooleanField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError, Optional, NumberRange
 from models import User
 
@@ -35,10 +35,11 @@ class ClassForm(FlaskForm):
 class BookForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired(), Length(max=200)])
     author = StringField('Author', validators=[Optional(), Length(max=200)])
-    isbn = StringField('ISBN', validators=[Optional(), Length(max=13)])
+    openlibrary_id = StringField('OpenLibrary ID', validators=[Optional(), Length(max=100)])
+    publication_year = IntegerField('Publication Year', validators=[Optional(), NumberRange(min=1000, max=2100, message='Year must be between 1000 and 2100')])
     book_type = SelectField('Type', choices=[('', 'Select Type'), ('Fiction', 'Fiction'), ('Non-Fiction', 'Non-Fiction')], validators=[Optional()])
-    sub_genre = StringField('Sub-genre', validators=[Optional(), Length(max=100)])
-    genre = StringField('Genre', validators=[Optional(), Length(max=100)])
+    genre = SelectField('Genre', choices=[('', 'Select Genre')], validators=[Optional()])
+    sub_genre = SelectField('Sub-genre', choices=[('', 'Select Sub-genre')], validators=[Optional()])
     topic = StringField('Topic', validators=[Optional(), Length(max=100)])
     lexile_rating = StringField('Lexile Rating', validators=[Optional(), Length(max=20)])
     grade = IntegerField('Grade', validators=[Optional(), NumberRange(min=1, max=12, message='Grade must be between 1 and 12')])
@@ -50,6 +51,7 @@ class CSVUploadForm(FlaskForm):
         DataRequired(),
         FileAllowed(['csv'], 'CSV files only!')
     ])
+    skip_enrichment = BooleanField('Skip OpenLibrary enrichment (faster import)', default=False)
 
 class ReviewForm(FlaskForm):
     rating = IntegerField('Rating (1-5 stars)', validators=[
@@ -65,6 +67,11 @@ class SuggestBookForm(FlaskForm):
     book_id = HiddenField('Book ID', validators=[DataRequired()])
     reason = TextAreaField('Why are you suggesting this book?', validators=[Optional()])
 
+class BookSuggestionForm(FlaskForm):
+    title = StringField('Book Title', validators=[DataRequired(), Length(max=200)])
+    author = StringField('Author', validators=[DataRequired(), Length(max=200)])
+    reason = TextAreaField('Why do you want to read this book?', validators=[Optional(), Length(max=500)])
+
 class SearchBookForm(FlaskForm):
     query = StringField('Search Books', validators=[DataRequired()])
 
@@ -74,11 +81,12 @@ class StudentBookFilterForm(FlaskForm):
         csrf = False  # GET-only filter form; no state changes
 
     book_type = SelectField(
-        'Type', choices=[('', 'Any'), ('Fiction', 'Fiction'), ('Non-Fiction', 'Non-Fiction')], validators=[Optional()]
+        'Type', choices=[('', 'Any'), ('Fiction', 'Fiction'), ('Non-Fiction', 'Non-Fiction'), ('__not_set__', 'Not Set')], validators=[Optional()]
     )
-    genre = SelectField('Genre', choices=[('', 'Any')], validators=[Optional()])
-    sub_genre = SelectField('Sub-genre', choices=[('', 'Any')], validators=[Optional()])
+    genre = SelectField('Genre', choices=[('', 'Any'), ('__not_set__', 'Not Set')], validators=[Optional()])
+    sub_genre = SelectField('Sub-genre', choices=[('', 'Any'), ('__not_set__', 'Not Set')], validators=[Optional()])
     min_grade = IntegerField('Min Grade', validators=[Optional(), NumberRange(min=1, max=12)])
     max_grade = IntegerField('Max Grade', validators=[Optional(), NumberRange(min=1, max=12)])
     owned = SelectField('Owned', choices=[('', 'Any'), ('Physical', 'Physical'), ('Kindle', 'Kindle'), ('Not Owned', 'Not Owned')], validators=[Optional()])
     search = StringField('Search', validators=[Optional(), Length(max=200)])
+    missing_olid = BooleanField('Missing OpenLibrary ID', default=False)

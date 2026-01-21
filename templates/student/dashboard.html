@@ -6,6 +6,15 @@
 <h1>My Reading Dashboard</h1>
 <p class="welcome-text">Welcome, {{ current_user.first_name }}!</p>
 
+<div class="quick-actions">
+    <h2>Quick Actions</h2>
+    <div class="action-buttons">
+        <a href="{{ url_for('student_reading_list') }}" class="btn btn-primary">Browse Books</a>
+        <a href="{{ url_for('student_suggest_new_book') }}" class="btn btn-secondary">📚 Suggest a New Book</a>
+        <a href="{{ url_for('books_read') }}" class="btn btn-secondary">View Books I've Read</a>
+    </div>
+</div>
+
 <div class="stats-grid">
     <div class="stat-card">
         <h3>{{ books_read|length }}</h3>
@@ -137,7 +146,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         {% endif %}
                     </div>
                     {% if suggestion.book.cover_url %}
-                        <img src="{{ suggestion.book.cover_url }}" alt="{{ suggestion.book.title }}" class="book-cover-sm">
+                        {% if suggestion.book.openlibrary_id %}
+                            <a href="https://openlibrary.org{{ suggestion.book.openlibrary_id }}" target="_blank" rel="noopener" title="View on OpenLibrary">
+                                <img src="{{ suggestion.book.cover_url }}" alt="{{ suggestion.book.title }}" class="book-cover-sm">
+                            </a>
+                        {% else %}
+                            <img src="{{ suggestion.book.cover_url }}" alt="{{ suggestion.book.title }}" class="book-cover-sm">
+                        {% endif %}
                     {% endif %}
                     <div class="book-meta">
                         {% if suggestion.book.book_type %}<span class="badge">{{ suggestion.book.book_type }}</span>{% endif %}

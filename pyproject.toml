@@ -16,4 +16,9 @@ dependencies = [
     "email-validator>=2.1.0",
     "gunicorn>=23.0.0",
     "psycopg2-binary>=2.9.10",
+    "ipython>=8.12.3",
+    "cyclopts>=2.9.9",
+    "attrs>=25.3.0",
+    "questionary>=2.1.0",
+    "toml>=0.10.2",
 ]

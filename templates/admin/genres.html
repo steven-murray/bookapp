@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Genres - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>Manage Genres & Categories</h1>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('genres')">Genres & Sub-genres</button>
+    <button class="tab-btn" onclick="switchTab('topics')">Topics</button>
+    <button class="tab-btn" onclick="switchTab('maps')">Genre Mappings</button>
+</div>
+
+<!-- Genres Tab -->
+<div id="genres-tab" class="tab-content active">
+    <div class="section">
+        <div class="section-header">
+            <h2>Genres & Sub-genres</h2>
+            <button class="btn btn-primary" onclick="showAddGenreModal()">Add Genre</button>
+        </div>
+        
+        <div class="genre-sections">
+            {% for book_type in ['Fiction', 'Non-Fiction'] %}
+                <div class="genre-type-section">
+                    <h3>{{ book_type }}</h3>
+                    <div class="genre-grid">
+                        {% for genre in genres %}
+                            {% if genre.book_type == book_type %}
+                                <div class="genre-card">
+                                    <div class="genre-header">
+                                        <h4>{{ genre.name }}</h4>
+                                        <div class="genre-actions">
+                                            <button class="btn btn-sm btn-secondary" onclick="showAddSubgenreModal({{ genre.id }}, '{{ genre.name }}')">+ Sub-genre</button>
+                                            <form method="POST" action="{{ url_for('delete_genre', genre_id=genre.id) }}" style="display: inline;" onsubmit="return confirm('Delete genre {{ genre.name }}?');">
+                                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    
+                                    {% if genre.sub_genres %}
+                                        <div class="subgenre-list">
+                                            {% for subgenre in genre.sub_genres %}
+                                                <div class="subgenre-item">
+                                                    <span>{{ subgenre.name }}</span>
+                                                    <form method="POST" action="{{ url_for('delete_subgenre', subgenre_id=subgenre.id) }}" style="display: inline;" onsubmit="return confirm('Delete sub-genre {{ subgenre.name }}?');">
+                                                        <button type="submit" class="btn-icon" title="Delete">×</button>
+                                                    </form>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <p class="empty-message">No sub-genres</p>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Topics Tab -->
+<div id="topics-tab" class="tab-content">
+    <div class="section">
+        <div class="section-header">
+            <h2>Topics</h2>
+            <button class="btn btn-primary" onclick="showAddTopicModal()">Add Topic</button>
+        </div>
+        
+        <div class="topics-grid">
+            {% for topic in topics %}
+                <div class="topic-item">
+                    <span>{{ topic.name }}</span>
+                    <form method="POST" action="{{ url_for('delete_topic', topic_id=topic.id) }}" style="display: inline;" onsubmit="return confirm('Delete topic {{ topic.name }}?');">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Genre Maps Tab -->
+<div id="maps-tab" class="tab-content">
+    <div class="section">
+        <div class="section-header">
+            <h2>Genre Mappings</h2>
+            <button class="btn btn-primary" onclick="showAddMapModal()">Add Mapping</button>
+        </div>
+        
+        <p class="info-text">Genre mappings allow alternative genre names to be automatically converted to canonical names during data import.</p>
+        
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Alternative Name</th>
+                    <th>Maps To (Canonical)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for map in genre_maps %}
+                    <tr>
+                        <td><code>{{ map.alternative_name }}</code></td>
+                        <td><strong>{{ map.canonical_name }}</strong></td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_genre_map', map_id=map.id) }}" style="display: inline;" onsubmit="return confirm('Delete mapping?');">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Genre Modal -->
+<div id="addGenreModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('addGenreModal')">&times;</span>
+        <h2>Add New Genre</h2>
+        <form method="POST" action="{{ url_for('add_genre') }}">
+            <div class="form-group">
+                <label for="genre_book_type">Book Type:</label>
+                <select name="book_type" id="genre_book_type" class="form-control" required>
+                    <option value="Fiction">Fiction</option>
+                    <option value="Non-Fiction">Non-Fiction</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="genre_name">Genre Name:</label>
+                <input type="text" name="name" id="genre_name" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Genre</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add Sub-genre Modal -->
+<div id="addSubgenreModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('addSubgenreModal')">&times;</span>
+        <h2>Add Sub-genre to <span id="subgenre-parent-name"></span></h2>
+        <form method="POST" action="{{ url_for('add_subgenre') }}">
+            <input type="hidden" name="genre_id" id="subgenre_genre_id">
+            <div class="form-group">
+                <label for="subgenre_name">Sub-genre Name:</label>
+                <input type="text" name="name" id="subgenre_name" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Sub-genre</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add Topic Modal -->
+<div id="addTopicModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('addTopicModal')">&times;</span>
+        <h2>Add New Topic</h2>
+        <form method="POST" action="{{ url_for('add_topic') }}">
+            <div class="form-group">
+                <label for="topic_name">Topic Name:</label>
+                <input type="text" name="name" id="topic_name" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Topic</button>
+        </form>
+    </div>
+</div>
+
+<!-- Add Genre Map Modal -->
+<div id="addMapModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('addMapModal')">&times;</span>
+        <h2>Add Genre Mapping</h2>
+        <form method="POST" action="{{ url_for('add_genre_map') }}">
+            <div class="form-group">
+                <label for="map_alternative">Alternative Name:</label>
+                <input type="text" name="alternative_name" id="map_alternative" class="form-control" placeholder="e.g., sci-fi" required>
+            </div>
+            <div class="form-group">
+                <label for="map_canonical">Canonical Name:</label>
+                <input type="text" name="canonical_name" id="map_canonical" class="form-control" placeholder="e.g., Science Fiction" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Mapping</button>
+        </form>
+    </div>
+</div>
+
+<style>
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #ddd;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: #666;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s;
+}
+
+.tab-btn:hover {
+    color: #333;
+}
+
+.tab-btn.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.genre-type-section {
+    margin-bottom: 40px;
+}
+
+.genre-type-section h3 {
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.genre-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.genre-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    background: white;
+}
+
+.genre-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.genre-header h4 {
+    margin: 0;
+    color: #007bff;
+}
+
+.genre-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.subgenre-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.subgenre-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+.btn-icon:hover {
+    color: #a71d2a;
+}
+
+.empty-message {
+    color: #999;
+    font-style: italic;
+    margin: 10px 0 0 0;
+}
+
+.topics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.topic-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+}
+
+.info-text {
+    background: #e7f3ff;
+    padding: 15px;
+    border-left: 4px solid #007bff;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+</style>
+
+<script>
+function switchTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(tabName + '-tab').classList.add('active');
+    
+    // Add active class to clicked button
+    event.target.classList.add('active');
+}
+
+function showAddGenreModal() {
+    document.getElementById('addGenreModal').style.display = 'block';
+}
+
+function showAddSubgenreModal(genreId, genreName) {
+    document.getElementById('subgenre_genre_id').value = genreId;
+    document.getElementById('subgenre-parent-name').textContent = genreName;
+    document.getElementById('addSubgenreModal').style.display = 'block';
+}
+
+function showAddTopicModal() {
+    document.getElementById('addTopicModal').style.display = 'block';
+}
+
+function showAddMapModal() {
+    document.getElementById('addMapModal').style.display = 'block';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+    }
+}
+</script>
+
+{% endblock %}

@@ -19,7 +19,6 @@
     {% if book.owned == 'Kindle' %}<span class="badge" title="Available on Kindle">📱 Kindle</span>{% endif %}
     {% if book.topic %}<span class="badge">{{ book.topic }}</span>{% endif %}
         {% if book.publication_year %}<span class="badge">{{ book.publication_year }}</span>{% endif %}
-        {% if book.isbn %}<span class="badge">ISBN {{ book.isbn }}</span>{% endif %}
     </div>
 
 <div class="form-container">

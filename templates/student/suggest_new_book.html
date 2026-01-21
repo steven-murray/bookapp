@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Suggest a New Book - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>📚 Suggest a New Book</h1>
+
+<p>Know a great book that's not in our library? Suggest it here and your teacher will review it!</p>
+
+<div class="form-container">
+    <form method="POST" action="{{ url_for('student_suggest_new_book') }}">
+        {{ form.hidden_tag() }}
+        
+        <div class="form-group">
+            {{ form.title.label }}
+            {{ form.title(class="form-control", placeholder="Enter the book title", autofocus=true) }}
+            {% if form.title.errors %}
+                <div class="error">{{ form.title.errors[0] }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.author.label }}
+            {{ form.author(class="form-control", placeholder="Enter the author's name") }}
+            {% if form.author.errors %}
+                <div class="error">{{ form.author.errors[0] }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="form-group">
+            {{ form.reason.label }}
+            {{ form.reason(class="form-control", rows=4, placeholder="Why do you want to read this book? (optional)") }}
+            {% if form.reason.errors %}
+                <div class="error">{{ form.reason.errors[0] }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Submit Suggestion</button>
+            <a href="{{ url_for('student_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+{% if my_suggestions %}
+    <div class="section mt-4">
+        <h2>Your Previous Suggestions</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Status</th>
+                    <th>Suggested</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for suggestion in my_suggestions %}
+                    <tr>
+                        <td><strong>{{ suggestion.title }}</strong></td>
+                        <td>{{ suggestion.author }}</td>
+                        <td>
+                            {% if suggestion.status == 'pending' %}
+                                <span class="badge" style="background-color: #ffa500;">⏳ Pending</span>
+                            {% elif suggestion.status == 'approved' %}
+                                <span class="badge" style="background-color: #4CAF50;">✓ Approved</span>
+                            {% elif suggestion.status == 'added' %}
+                                <span class="badge" style="background-color: #2196F3;">📚 Added to Library!</span>
+                            {% elif suggestion.status == 'rejected' %}
+                                <span class="badge" style="background-color: #f44336;">✗ Not Added</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ suggestion.suggested_at.strftime('%b %d, %Y') }}</td>
+                        <td>
+                            {% if suggestion.admin_notes %}
+                                <small>{{ suggestion.admin_notes }}</small>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endif %}
+
+{% endblock %}

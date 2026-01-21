@@ -1,0 +1,49 @@
+topics = [
+    "Friendship", "Courage", "Love", "Betrayal", "Redemption", 
+    "Survival", "Identity", "Justice", "Freedom", "Family",
+    "Adventure", "Mystery", "War", "Peace", "Growth"
+]
+
+[genre_maps]
+"juvenile fiction" = "Children's Fiction"
+"kids fiction" = "Children's Fiction"
+"teen fiction" = "Young Adult"
+"sci-fi" = "Science Fiction"
+"humor" = "Comedy"
+
+[genres]
+[genres.Fiction]
+Fantasy = ["High Fantasy", "Urban Fantasy", "Dark Fantasy"]
+"Science Fiction" = ["Dystopian", "Space Opera", "Cyberpunk"]
+Mystery = ["Detective", "Cozy Mystery", "Hard-Boiled"]
+Romance = ["Contemporary", "Historical Romance", "Paranormal Romance"]
+"Historical Fiction" = ["Historical Romance", "War Stories", "Period Drama"]
+Adventure = ["Action Adventure", "Survival", "Exploration"]
+Horror = ["Gothic", "Psychological Horror", "Supernatural Horror"]
+Thriller = ["Psychological Thriller", "Crime Thriller", "Spy Thriller"]
+"Children's Fiction" = ["Picture Books", "Early Readers", "Middle Grade", "Poetry", "Comedy"]
+"Young Adult" = ["Contemporary", "Dystopian", "Fantasy"]
+Comedy = ["Satire", "Romantic Comedy", "Dark Comedy"]
+"Graphic Novel" = ["Superhero", "Manga"]
+Drama = ["Family Drama", "Legal Drama", "Medical Drama"]
+
+[genres."Non-Fiction"]
+Biography = []
+"Self Help" = ["Motivational", "Psychology", "Wellness", "Productivity", "Relationships"]
+History = ["Ancient History", "Medieval History", "Modern History"]
+Science = ["Popular Science", "Physics", "Biology", "Chemistry", "Astronomy"]
+Poetry = ["Contemporary Poetry", "Classical Poetry"]
+Philosophy = ["Western Philosophy", "Eastern Philosophy", "Ethics"]
+Religion = ["World Religions", "Spirituality", "Theology", "Christianity", "Islam", "Buddhism"]
+Travel = ["Travel Guides", "Adventure Travel", "Cultural Travel"]
+Art = ["Art History", "Techniques", "Artists"]
+Music = ["Music History", "Biographies of Musicians", "Music Theory"]
+Cooking = ["Cookbooks", "Baking", "International Cuisine", "Dietary"]
+Health = ["Nutrition", "Mental Health", "Fitness", "Medical"]
+Business = ["Entrepreneurship", "Management", "Marketing", "Economics"]
+Finance = ["Personal Finance", "Investing", "Economics", "Financial Planning"]
+Educational = ["Textbooks", "Study Guides", "Reference"]
+Mathematics = ["Algebra", "Calculus", "Statistics", "Geometry"]
+Technology = ["Programming", "Networking", "Cybersecurity", "AI"]
+Politics = ["Political Theory", "International Relations", "Public Policy"]
+

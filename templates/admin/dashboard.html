@@ -19,9 +19,58 @@
         <h3>{{ total_books }}</h3>
         <p>Books in Library</p>
     </div>
+    <div class="stat-card" {% if pending_suggestions > 0 %}style="border: 2px solid #ff9800;"{% endif %}>
+        <h3>{{ pending_suggestions }}</h3>
+        <p>📬 <a href="{{ url_for('admin_book_suggestions') }}">Book Suggestions</a></p>
+    </div>
 </div>
 
 <div class="dashboard-sections">
+    <div class="section">
+        <h2>Books Needed (Not Owned)</h2>
+        {% if books_needed %}
+            <p class="mb-3">These books are in students' reading lists but not currently owned:</p>
+            <div class="books-needed-list">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Author</th>
+                            <th>Genre</th>
+                            <th>Students</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in books_needed[:10] %}
+                            <tr>
+                                <td><strong>{{ item.book.title }}</strong></td>
+                                <td>{{ item.book.author or 'N/A' }}</td>
+                                <td>{{ item.book.genre or 'N/A' }}</td>
+                                <td>
+                                    <span class="badge" title="{{ item.student_count }} student(s) want this book">
+                                        {{ item.student_count }} 👥
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('edit_book', book_id=item.book.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                                    {% if item.book.openlibrary_id %}
+                                        <a href="https://openlibrary.org{{ item.book.openlibrary_id }}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary" title="View on OpenLibrary">🔗</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if books_needed|length > 10 %}
+                    <p class="mt-2"><em>Showing top 10 of {{ books_needed|length }} books. <a href="{{ url_for('admin_books', owned='Not Owned') }}">View all</a></em></p>
+                {% endif %}
+            </div>
+        {% else %}
+            <p>All books in students' reading lists are owned! 🎉</p>
+        {% endif %}
+    </div>
+
     <div class="section">
         <h2>Your Classes</h2>
         {% if classes %}
@@ -69,6 +118,7 @@
         <a href="{{ url_for('admin_books') }}" class="btn btn-secondary">Manage Books</a>
         <a href="{{ url_for('upload_books') }}" class="btn btn-secondary">Upload Books (CSV)</a>
         <a href="{{ url_for('admin_classes') }}" class="btn btn-secondary">Manage Classes</a>
+        <a href="{{ url_for('admin_book_suggestions') }}" class="btn btn-secondary">📬 Review Book Suggestions</a>
     </div>
 </div>
 {% endblock %}

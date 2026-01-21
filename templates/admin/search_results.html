@@ -25,16 +25,12 @@
                     {% if book.publication_year %}
                         <span>Published: {{ book.publication_year }}</span>
                     {% endif %}
-                    {% if book.isbn %}
-                        <span>ISBN: {{ book.isbn }}</span>
-                    {% endif %}
                 </div>
                 
                 <form method="POST" action="{{ url_for('add_book_from_openlibrary') }}" class="mt-3">
                     {{ form.hidden_tag() }}
                     <input type="hidden" name="title" value="{{ book.title }}">
                     <input type="hidden" name="author" value="{{ book.author }}">
-                    <input type="hidden" name="isbn" value="{{ book.isbn }}">
                     <input type="hidden" name="openlibrary_id" value="{{ book.openlibrary_id }}">
                     <input type="hidden" name="cover_id" value="{{ book.cover_id }}">
                     <input type="hidden" name="publication_year" value="{{ book.publication_year }}">

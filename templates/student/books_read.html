@@ -47,9 +47,15 @@
     
     <div class="books-read-grid">
         {% for br in books_read %}
-            <div class="book-read-card">
+            <div class="book-card">
                 {% if br.book.cover_url %}
-                    <img src="{{ br.book.cover_url }}" alt="{{ br.book.title }}" class="book-cover">
+                    {% if br.book.openlibrary_id %}
+                        <a href="https://openlibrary.org{{ br.book.openlibrary_id }}" target="_blank" rel="noopener" title="View on OpenLibrary">
+                            <img src="{{ br.book.cover_url }}" alt="{{ br.book.title }}" class="book-cover">
+                        </a>
+                    {% else %}
+                        <img src="{{ br.book.cover_url }}" alt="{{ br.book.title }}" class="book-cover">
+                    {% endif %}
                 {% else %}
                     <div class="book-cover-placeholder">📚</div>
                 {% endif %}

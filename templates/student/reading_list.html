@@ -5,43 +5,6 @@
 {% block content %}
 <h1>📚 My Reading List</h1>
 
-<form method="GET" action="{{ url_for('student_reading_list') }}" class="filter-form mb-4">
-    <div class="form-row">
-        <div class="form-group">
-            {{ filter_form.search.label }}
-            {{ filter_form.search(class="form-control", placeholder="Search title or author") }}
-        </div>
-        <div class="form-group">
-            {{ filter_form.book_type.label }}
-            {{ filter_form.book_type(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ filter_form.genre.label }}
-            {{ filter_form.genre(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ filter_form.sub_genre.label }}
-            {{ filter_form.sub_genre(class="form-control") }}
-        </div>
-        <div class="form-group">
-            {{ filter_form.min_grade.label }}
-            {{ filter_form.min_grade(class="form-control", placeholder="1") }}
-        </div>
-        <div class="form-group">
-            {{ filter_form.max_grade.label }}
-            {{ filter_form.max_grade(class="form-control", placeholder="12") }}
-        </div>
-        <div class="form-group">
-            {{ filter_form.owned.label }}
-            {{ filter_form.owned(class="form-control") }}
-        </div>
-    </div>
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Apply Filters</button>
-        <a href="{{ url_for('student_reading_list') }}" class="btn btn-secondary">Clear</a>
-    </div>
-</form>
-
 {% if reading_list %}
     <p>You have {{ reading_list|length }} books in your reading list</p>
     
@@ -87,6 +50,23 @@
                 </div>
                 <div class="item-actions">
                     <a href="{{ url_for('mark_book_read', book_id=item.book.id) }}" class="btn btn-success">Mark as Read</a>
+                    <button class="btn btn-secondary view-details-btn" 
+                            data-book-id="{{ item.book.id }}"
+                            data-title="{{ item.book.title }}"
+                            data-author="{{ item.book.author or '' }}"
+                            data-type="{{ item.book.book_type or '' }}"
+                            data-genre="{{ item.book.genre or '' }}"
+                            data-subgenre="{{ item.book.sub_genre or '' }}"
+                            data-topic="{{ item.book.topic or '' }}"
+                            data-lexile="{{ item.book.lexile_rating or '' }}"
+                            data-grade="{{ item.book.grade if item.book.grade is not none else '' }}"
+                            data-owned="{{ item.book.owned or '' }}"
+                            data-year="{{ item.book.publication_year or '' }}"
+                            data-description="{{ item.book.description or '' }}"
+                            data-cover="{{ item.book.cover_url or '' }}"
+                            data-olid="{{ item.book.openlibrary_id or '' }}">
+                        View Details
+                    </button>
                     <a href="{{ url_for('remove_from_reading_list', item_id=item.id) }}" 
                        class="btn btn-danger" 
                        onclick="return confirm('Remove from reading list?')">Remove</a>
@@ -103,7 +83,7 @@
 
 <div class="section mt-5">
     <h2>Browse Books to Add</h2>
-    <form method="GET" action="{{ url_for('student_reading_list') }}" class="filter-form">
+    <form method="GET" action="{{ url_for('student_reading_list') }}" class="filter-form" id="browseFilterForm">
         <div class="form-row">
             <div class="form-group">
                 {{ filter_form.search.label }}
@@ -111,15 +91,15 @@
             </div>
             <div class="form-group">
                 {{ filter_form.book_type.label }}
-                {{ filter_form.book_type(class="form-control") }}
+                {{ filter_form.book_type(class="form-control", id="browse_book_type") }}
             </div>
             <div class="form-group">
                 {{ filter_form.genre.label }}
-                {{ filter_form.genre(class="form-control") }}
+                {{ filter_form.genre(class="form-control", id="browse_genre") }}
             </div>
             <div class="form-group">
                 {{ filter_form.sub_genre.label }}
-                {{ filter_form.sub_genre(class="form-control") }}
+                {{ filter_form.sub_genre(class="form-control", id="browse_sub_genre") }}
             </div>
             <div class="form-group">
                 {{ filter_form.min_grade.label }}
@@ -140,13 +120,20 @@
         </div>
     </form>
     {% if all_books %}
+        <p class="mb-3">Showing {{ all_books|length }} of {{ total_books }} book(s) (Page {{ page }} of {{ total_pages }})</p>
         <div class="book-browse-grid">
             {% for book in all_books %}
                 {% set in_list = reading_list|selectattr('book.id', 'equalto', book.id)|list|length > 0 %}
                 {% if not in_list %}
-                    <div class="book-browse-card">
+                    <div class="book-card">
                         {% if book.cover_url %}
-                            <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="book-cover">
+                            {% if book.openlibrary_id %}
+                                <a href="https://openlibrary.org{{ book.openlibrary_id }}" target="_blank" rel="noopener" title="View on OpenLibrary">
+                                    <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="book-cover">
+                                </a>
+                            {% else %}
+                                <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="book-cover">
+                            {% endif %}
                         {% else %}
                             <div class="book-cover-placeholder">📚</div>
                         {% endif %}
@@ -163,13 +150,404 @@
                             {% if book.owned == 'Physical' %}<span class="badge" title="Available physically">📚 Physical</span>{% endif %}
                             {% if book.owned == 'Kindle' %}<span class="badge" title="Available on Kindle">📱 Kindle</span>{% endif %}
                         </div>
-                        <a href="{{ url_for('add_to_reading_list', book_id=book.id) }}" class="btn btn-sm btn-primary">Add to List</a>
+                        <div class="book-card-actions">
+                            <button class="btn btn-sm btn-secondary view-details-btn" 
+                                    data-book-id="{{ book.id }}"
+                                    data-title="{{ book.title }}"
+                                    data-author="{{ book.author or '' }}"
+                                    data-type="{{ book.book_type or '' }}"
+                                    data-genre="{{ book.genre or '' }}"
+                                    data-subgenre="{{ book.sub_genre or '' }}"
+                                    data-topic="{{ book.topic or '' }}"
+                                    data-lexile="{{ book.lexile_rating or '' }}"
+                                    data-grade="{{ book.grade if book.grade is not none else '' }}"
+                                    data-owned="{{ book.owned or '' }}"
+                                    data-year="{{ book.publication_year or '' }}"
+                                    data-description="{{ book.description or '' }}"
+                                    data-cover="{{ book.cover_url or '' }}"
+                                    data-olid="{{ book.openlibrary_id or '' }}">
+                                View Details
+                            </button>
+                            <a href="{{ url_for('add_to_reading_list', book_id=book.id) }}" class="btn btn-sm btn-primary">Add to List</a>
+                        </div>
                     </div>
                 {% endif %}
             {% endfor %}
         </div>
+        
+        <!-- Pagination Controls -->
+        {% if total_pages > 1 %}
+            <div class="pagination">
+                {% if page > 1 %}
+                    <a href="{{ url_for('student_reading_list', page=page-1, **request.args.to_dict()|reject_page) }}" class="btn btn-secondary">« Previous</a>
+                {% else %}
+                    <button class="btn btn-secondary" disabled>« Previous</button>
+                {% endif %}
+                
+                <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
+                
+                {% if page < total_pages %}
+                    <a href="{{ url_for('student_reading_list', page=page+1, **request.args.to_dict()|reject_page) }}" class="btn btn-secondary">Next »</a>
+                {% else %}
+                    <button class="btn btn-secondary" disabled>Next »</button>
+                {% endif %}
+            </div>
+        {% endif %}
     {% else %}
         <p>No books available yet.</p>
     {% endif %}
 </div>
+
+<!-- Book Details Modal -->
+<div id="bookDetailsModal" class="modal">
+    <div class="modal-content modal-large">
+        <span class="close" onclick="closeBookDetails()">&times;</span>
+        <div id="bookDetailsContent">
+            <!-- Content will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+
+<!-- Suggest Edit Modal -->
+<div id="suggestEditModal" class="modal">
+    <div class="modal-content modal-large">
+        <span class="close" onclick="closeSuggestEditModal()">&times;</span>
+        <h2>Suggest Edit for <span id="editBookTitle"></span></h2>
+        <p class="lead">Suggest corrections or improvements to this book's information.</p>
+        
+        <form id="suggestEditForm">
+            <input type="hidden" id="editBookId" name="book_id">
+            
+            <div class="form-group">
+                <label for="editReason">Reason for Suggested Changes *</label>
+                <textarea class="form-control" id="editReason" name="reason" rows="3" required placeholder="Explain what you're correcting and why..."></textarea>
+            </div>
+            
+            <p><em>Only fill in the fields you want to change. Leave others blank to keep the current value.</em></p>
+            
+            <div class="form-group">
+                <label for="editTitle">Title</label>
+                <input type="text" class="form-control" id="editTitle" name="title">
+            </div>
+            
+            <div class="form-group">
+                <label for="editAuthor">Author</label>
+                <input type="text" class="form-control" id="editAuthor" name="author">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editBookType">Book Type</label>
+                    <select class="form-control" id="editBookType" name="book_type">
+                        <option value="">-- No Change --</option>
+                        <option value="Fiction">Fiction</option>
+                        <option value="Non-Fiction">Non-Fiction</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editGenre">Genre</label>
+                    <input type="text" class="form-control" id="editGenre" name="genre" placeholder="e.g., Mystery, Science">
+                </div>
+                
+                <div class="form-group">
+                    <label for="editSubGenre">Sub-genre</label>
+                    <input type="text" class="form-control" id="editSubGenre" name="sub_genre" placeholder="e.g., Detective, Biology">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editTopic">Topic</label>
+                    <input type="text" class="form-control" id="editTopic" name="topic">
+                </div>
+                
+                <div class="form-group">
+                    <label for="editGrade">Grade Level</label>
+                    <input type="number" class="form-control" id="editGrade" name="grade" min="1" max="12" placeholder="1-12">
+                </div>
+                
+                <div class="form-group">
+                    <label for="editOwned">Owned Status</label>
+                    <select class="form-control" id="editOwned" name="owned">
+                        <option value="">-- No Change --</option>
+                        <option value="Physical">Physical</option>
+                        <option value="Kindle">Kindle</option>
+                        <option value="Not Owned">Not Owned</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="editDescription">Description</label>
+                <textarea class="form-control" id="editDescription" name="description" rows="4"></textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Submit Suggestion</button>
+                <button type="button" class="btn btn-secondary" onclick="closeSuggestEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Book details modal functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const detailButtons = document.querySelectorAll('.view-details-btn');
+    
+    detailButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const bookData = {
+                id: this.dataset.bookId,
+                title: this.dataset.title,
+                author: this.dataset.author,
+                type: this.dataset.type,
+                genre: this.dataset.genre,
+                subgenre: this.dataset.subgenre,
+                topic: this.dataset.topic,
+                lexile: this.dataset.lexile,
+                grade: this.dataset.grade,
+                owned: this.dataset.owned,
+                year: this.dataset.year,
+                description: this.dataset.description,
+                cover: this.dataset.cover,
+                olid: this.dataset.olid
+            };
+            showBookDetails(bookData);
+        });
+    });
+});
+
+function showBookDetails(book) {
+    const content = document.getElementById('bookDetailsContent');
+    
+    let html = '<div class="book-details">';
+    
+    // Cover and Title
+    html += '<div class="book-details-header">';
+    if (book.cover) {
+        html += `<img src="${book.cover}" alt="${book.title}" class="book-details-cover">`;
+    } else {
+        html += '<div class="book-cover-placeholder-large">📚</div>';
+    }
+    html += '<div class="book-details-title-section">';
+    html += `<h2>${book.title}</h2>`;
+    if (book.author) {
+        html += `<p class="book-details-author">by ${book.author}</p>`;
+    }
+    if (book.olid) {
+        html += `<p><a href="https://openlibrary.org${book.olid}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">View on OpenLibrary →</a></p>`;
+    }
+    if (book.description) {
+        html += '<div class="book-details-description-inline">';
+        html += '<h4>Description</h4>';
+        html += `<p>${book.description}</p>`;
+        html += '</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+    
+    // Metadata
+    html += '<div class="book-details-metadata">';
+    html += '<h3>Book Information</h3>';
+    html += '<table class="metadata-table">';
+    
+    // Always show these key fields
+    html += `<tr><td><strong>Type:</strong></td><td>${book.type ? `<span class="badge">${book.type}</span>` : '<span class="unknown-value">Unknown</span>'}</td></tr>`;
+    html += `<tr><td><strong>Genre:</strong></td><td>${book.genre ? `<span class="badge">${book.genre}</span>` : '<span class="unknown-value">Unknown</span>'}</td></tr>`;
+    html += `<tr><td><strong>Sub-genre:</strong></td><td>${book.subgenre ? `<span class="badge">${book.subgenre}</span>` : '<span class="unknown-value">Unknown</span>'}</td></tr>`;
+    html += `<tr><td><strong>Publication Year:</strong></td><td>${book.year ? book.year : '<span class="unknown-value">Unknown</span>'}</td></tr>`;
+    html += `<tr><td><strong>Grade Level:</strong></td><td>${book.grade ? `<span class="badge">Grade ${book.grade}</span>` : '<span class="unknown-value">Unknown</span>'}</td></tr>`;
+    
+    // Show other fields only if they exist
+    if (book.topic) {
+        html += `<tr><td><strong>Topic:</strong></td><td><span class="badge">${book.topic}</span></td></tr>`;
+    }
+    if (book.lexile) {
+        html += `<tr><td><strong>Lexile Rating:</strong></td><td><span class="badge">${book.lexile}</span></td></tr>`;
+    }
+    if (book.owned) {
+        let ownedIcon = book.owned === 'Physical' ? '📚' : book.owned === 'Kindle' ? '📱' : '';
+        html += `<tr><td><strong>Availability:</strong></td><td><span class="badge">${ownedIcon} ${book.owned}</span></td></tr>`;
+    }
+    
+    html += '</table>';
+    html += '</div>';
+    
+    // Add "Suggest Edit" button
+    html += '<div style="margin-top: 20px; text-align: center;">';
+    html += `<button class="btn btn-primary" onclick="openSuggestEditModal(${book.id}, '${book.title.replace(/'/g, "\\'")}')">📝 Suggest Edit</button>`;
+    html += '</div>';
+    
+    html += '</div>';
+    
+    content.innerHTML = html;
+    document.getElementById('bookDetailsModal').style.display = 'block';
+}
+
+function closeBookDetails() {
+    document.getElementById('bookDetailsModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const detailsModal = document.getElementById('bookDetailsModal');
+    const editModal = document.getElementById('suggestEditModal');
+    if (event.target === detailsModal) {
+        closeBookDetails();
+    }
+    if (event.target === editModal) {
+        closeSuggestEditModal();
+    }
+}
+
+// Suggest Edit Modal Functions
+function openSuggestEditModal(bookId, bookTitle) {
+    // Close the book details modal
+    closeBookDetails();
+    
+    // Set book info
+    document.getElementById('editBookId').value = bookId;
+    document.getElementById('editBookTitle').textContent = bookTitle;
+    
+    // Clear form
+    document.getElementById('suggestEditForm').reset();
+    document.getElementById('editBookId').value = bookId; // Reset clears this, so set again
+    
+    // Show modal
+    document.getElementById('suggestEditModal').style.display = 'block';
+}
+
+function closeSuggestEditModal() {
+    document.getElementById('suggestEditModal').style.display = 'none';
+}
+
+// Handle suggest edit form submission
+document.getElementById('suggestEditForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const bookId = document.getElementById('editBookId').value;
+    const formData = new FormData(this);
+    
+    // Build data object with only filled fields
+    const data = {
+        reason: formData.get('reason')
+    };
+    
+    if (formData.get('title')) data.title = formData.get('title');
+    if (formData.get('author')) data.author = formData.get('author');
+    if (formData.get('book_type')) data.book_type = formData.get('book_type');
+    if (formData.get('genre')) data.genre = formData.get('genre');
+    if (formData.get('sub_genre')) data.sub_genre = formData.get('sub_genre');
+    if (formData.get('topic')) data.topic = formData.get('topic');
+    if (formData.get('grade')) data.grade = parseInt(formData.get('grade'));
+    if (formData.get('owned')) data.owned = formData.get('owned');
+    if (formData.get('description')) data.description = formData.get('description');
+    
+    // Submit to server
+    fetch(`/student/book/${bookId}/suggest-edit`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            closeSuggestEditModal();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        alert('Error submitting suggestion: ' + error);
+    });
+});
+
+// Dynamic filter dropdowns for Browse Books section
+document.addEventListener('DOMContentLoaded', function() {
+    const bookTypeSelect = document.getElementById('browse_book_type');
+    const genreSelect = document.getElementById('browse_genre');
+    const subGenreSelect = document.getElementById('browse_sub_genre');
+    
+    if (!bookTypeSelect || !genreSelect || !subGenreSelect) return;
+    
+    // Store original selected values
+    const originalGenre = genreSelect.value;
+    const originalSubGenre = subGenreSelect.value;
+    
+    // Update genres when book type changes
+    bookTypeSelect.addEventListener('change', function() {
+        const bookType = this.value;
+        updateGenreDropdown(bookType, originalGenre);
+    });
+    
+    // Update sub-genres when genre changes
+    genreSelect.addEventListener('change', function() {
+        const bookType = bookTypeSelect.value;
+        const genreName = this.value;
+        updateSubGenreDropdown(bookType, genreName, originalSubGenre);
+    });
+    
+    // Initialize on page load
+    if (bookTypeSelect.value) {
+        updateGenreDropdown(bookTypeSelect.value, originalGenre);
+    }
+    
+    function updateGenreDropdown(bookType, selectedValue = '') {
+        if (!bookType) {
+            genreSelect.innerHTML = '<option value="">Any</option>';
+            subGenreSelect.innerHTML = '<option value="">Any</option>';
+            return;
+        }
+        
+        fetch(`/api/genres/${bookType}`)
+            .then(response => response.json())
+            .then(genres => {
+                genreSelect.innerHTML = '<option value="">Any</option>';
+                genres.forEach(genre => {
+                    const option = document.createElement('option');
+                    option.value = genre.name;
+                    option.textContent = genre.name;
+                    if (genre.name === selectedValue) {
+                        option.selected = true;
+                    }
+                    genreSelect.appendChild(option);
+                });
+                
+                // Update sub-genres if genre is selected
+                if (genreSelect.value) {
+                    updateSubGenreDropdown(bookType, genreSelect.value, originalSubGenre);
+                } else {
+                    subGenreSelect.innerHTML = '<option value="">Any</option>';
+                }
+            });
+    }
+    
+    function updateSubGenreDropdown(bookType, genreName, selectedValue = '') {
+        if (!bookType || !genreName) {
+            subGenreSelect.innerHTML = '<option value="">Any</option>';
+            return;
+        }
+        
+        fetch(`/api/subgenres-by-name/${bookType}/${encodeURIComponent(genreName)}`)
+            .then(response => response.json())
+            .then(subgenres => {
+                subGenreSelect.innerHTML = '<option value="">Any</option>';
+                subgenres.forEach(subgenre => {
+                    const option = document.createElement('option');
+                    option.value = subgenre.name;
+                    option.textContent = subgenre.name;
+                    if (subgenre.name === selectedValue) {
+                        option.selected = true;
+                    }
+                    subGenreSelect.appendChild(option);
+                });
+            });
+    }
+});
+</script>
 {% endblock %}

@@ -21,57 +21,296 @@
     </form>
 </div>
 
+<form method="GET" action="{{ url_for('admin_books') }}" class="filter-form mb-4" id="filterForm">
+    <div class="form-row">
+        <div class="form-group">
+            {{ filter_form.search.label }}
+            {{ filter_form.search(class="form-control", placeholder="Search title or author") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.book_type.label }}
+            {{ filter_form.book_type(class="form-control", id="filter_book_type") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.genre.label }}
+            {{ filter_form.genre(class="form-control", id="filter_genre") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.sub_genre.label }}
+            {{ filter_form.sub_genre(class="form-control", id="filter_sub_genre") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.min_grade.label }}
+            {{ filter_form.min_grade(class="form-control", placeholder="1") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.max_grade.label }}
+            {{ filter_form.max_grade(class="form-control", placeholder="12") }}
+        </div>
+        <div class="form-group">
+            {{ filter_form.owned.label }}
+            {{ filter_form.owned(class="form-control") }}
+        </div>
+        <div class="form-group" style="display: flex; align-items: center; padding-top: 28px;">
+            {{ filter_form.missing_olid() }}
+            {{ filter_form.missing_olid.label }}
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Apply Filters</button>
+        <a href="{{ url_for('admin_books') }}" class="btn btn-secondary">Clear</a>
+    </div>
+</form>
+
 {% if books %}
     <p>Total books: {{ books|length }}</p>
-    <table class="data-table">
-        <thead>
-            <tr>
-                <th>Cover</th>
-                <th>Title</th>
-                <th>Author</th>
-                <th>Type</th>
-                <th>Genre</th>
-                <th>Sub-genre</th>
-                <th>Lexile</th>
-                <th>Grade</th>
-                <th>Owned</th>
-                <th>ISBN</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for book in books %}
+    
+    <form method="POST" action="{{ url_for('bulk_book_action') }}" id="bulkActionForm">
+        <div class="bulk-actions-bar">
+            <label>
+                <input type="checkbox" id="selectAll"> Select All
+            </label>
+            
+            <select name="action" id="bulkAction" class="form-control" style="width: auto; display: inline-block;">
+                <option value="">-- Bulk Actions --</option>
+                <option value="delete">Delete Selected</option>
+                <option value="set_type">Set Type</option>
+                <option value="set_genre">Set Genre</option>
+                <option value="set_owned">Set Owned Status</option>
+            </select>
+            
+            <div id="typeOptions" style="display: none; display: inline-block;">
+                <select name="book_type" class="form-control" style="width: auto;">
+                    <option value="">Select Type</option>
+                    <option value="Fiction">Fiction</option>
+                    <option value="Non-Fiction">Non-Fiction</option>
+                </select>
+            </div>
+            
+            <div id="ownedOptions" style="display: none; display: inline-block;">
+                <select name="owned" class="form-control" style="width: auto;">
+                    <option value="">Select Status</option>
+                    <option value="Physical">Physical</option>
+                    <option value="Kindle">Kindle</option>
+                    <option value="Not Owned">Not Owned</option>
+                </select>
+            </div>
+            
+            <div id="genreOptions" style="display: none; display: inline-block;">
+                <input type="text" name="genre" class="form-control" placeholder="Enter genre" style="width: 200px;">
+            </div>
+            
+            <button type="submit" class="btn btn-primary" onclick="return confirmBulkAction()">Apply</button>
+        </div>
+        
+        <table class="data-table">
+            <thead>
                 <tr>
-                    <td>
-                        {% if book.cover_url %}
-                            <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="book-cover-sm">
-                        {% else %}
-                            <div class="book-cover-placeholder">📚</div>
-                        {% endif %}
-                    </td>
-                    <td><strong>{{ book.title }}</strong></td>
-                    <td>{{ book.author or 'N/A' }}</td>
-                    <td>{{ book.book_type or 'N/A' }}</td>
-                    <td>{{ book.genre or 'N/A' }}</td>
-                    <td>{{ book.sub_genre or 'N/A' }}</td>
-                    <td>{{ book.lexile_rating or 'N/A' }}</td>
-                    <td>{{ book.grade if book.grade is not none else 'N/A' }}</td>
-                    <td>{{ book.owned or 'Not Owned' }}</td>
-                    <td>{{ book.isbn or 'N/A' }}</td>
-                    <td>
-                        <a href="{{ url_for('edit_book', book_id=book.id) }}" class="btn btn-sm btn-secondary">Edit</a>
-                        <form method="POST" action="{{ url_for('delete_book', book_id=book.id) }}" style="display:inline-block" onsubmit="return confirm('Delete this book? This cannot be undone.');">
-                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                        </form>
-                    </td>
+                    <th><input type="checkbox" id="selectAllHeader"></th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Type</th>
+                    <th>Genre</th>
+                    <th>Sub-genre</th>
+                    <th>Lexile</th>
+                    <th>Grade</th>
+                    <th>Owned</th>
+                    <th>Actions</th>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                {% for book in books %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="book_ids" value="{{ book.id }}" class="book-checkbox">
+                        </td>
+                        <td>
+                            {% if book.openlibrary_id %}
+                                <strong><a href="https://openlibrary.org{{ book.openlibrary_id }}" target="_blank" rel="noopener">{{ book.title }}</a></strong>
+                            {% else %}
+                                <strong>{{ book.title }}</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ book.author or 'N/A' }}</td>
+                        <td>{{ book.book_type or 'N/A' }}</td>
+                        <td>{{ book.genre or 'N/A' }}</td>
+                        <td>{{ book.sub_genre or 'N/A' }}</td>
+                        <td>{{ book.lexile_rating or 'N/A' }}</td>
+                        <td>{{ book.grade if book.grade is not none else 'N/A' }}</td>
+                        <td>{{ book.owned or 'Not Owned' }}</td>
+                        <td>
+                            <a href="{{ url_for('edit_book', book_id=book.id) }}" class="btn btn-sm btn-secondary">Edit</a>
+                            <form method="POST" action="{{ url_for('delete_book', book_id=book.id) }}" style="display:inline-block" onsubmit="return confirm('Delete this book? This cannot be undone.');">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </form>
 {% else %}
     <div class="empty-state">
         <p>No books in the library yet.</p>
         <a href="{{ url_for('create_book') }}" class="btn btn-primary">Add Your First Book</a>
     </div>
 {% endif %}
+
+<script>
+// Select all functionality
+document.getElementById('selectAll')?.addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('.book-checkbox');
+    checkboxes.forEach(cb => cb.checked = this.checked);
+});
+
+document.getElementById('selectAllHeader')?.addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('.book-checkbox');
+    checkboxes.forEach(cb => cb.checked = this.checked);
+    document.getElementById('selectAll').checked = this.checked;
+});
+
+// Show/hide options based on action
+document.getElementById('bulkAction')?.addEventListener('change', function() {
+    document.getElementById('typeOptions').style.display = 'none';
+    document.getElementById('ownedOptions').style.display = 'none';
+    document.getElementById('genreOptions').style.display = 'none';
+    
+    if (this.value === 'set_type') {
+        document.getElementById('typeOptions').style.display = 'inline-block';
+    } else if (this.value === 'set_owned') {
+        document.getElementById('ownedOptions').style.display = 'inline-block';
+    } else if (this.value === 'set_genre') {
+        document.getElementById('genreOptions').style.display = 'inline-block';
+    }
+});
+
+function confirmBulkAction() {
+    const action = document.getElementById('bulkAction').value;
+    const checkedBoxes = document.querySelectorAll('.book-checkbox:checked');
+    
+    if (!action) {
+        alert('Please select an action.');
+        return false;
+    }
+    
+    if (checkedBoxes.length === 0) {
+        alert('Please select at least one book.');
+        return false;
+    }
+    
+    if (action === 'delete') {
+        return confirm(`Delete ${checkedBoxes.length} book(s)? This cannot be undone.`);
+    }
+    
+    return true;
+}
+
+// Dynamic filter dropdowns
+document.addEventListener('DOMContentLoaded', function() {
+    const bookTypeSelect = document.getElementById('filter_book_type');
+    const genreSelect = document.getElementById('filter_genre');
+    const subGenreSelect = document.getElementById('filter_sub_genre');
+    
+    // Store original selected values
+    const originalGenre = genreSelect.value;
+    const originalSubGenre = subGenreSelect.value;
+    
+    // Update genres when book type changes
+    if (bookTypeSelect) {
+        bookTypeSelect.addEventListener('change', function() {
+            const bookType = this.value;
+            updateGenreDropdown(bookType, originalGenre);
+        });
+        
+        // Initialize on page load
+        if (bookTypeSelect.value) {
+            updateGenreDropdown(bookTypeSelect.value, originalGenre);
+        }
+    }
+    
+    // Update sub-genres when genre changes
+    if (genreSelect) {
+        genreSelect.addEventListener('change', function() {
+            const bookType = bookTypeSelect.value;
+            const genreName = this.value;
+            updateSubGenreDropdown(bookType, genreName, originalSubGenre);
+        });
+        
+        // Initialize on page load
+        if (bookTypeSelect.value && genreSelect.value) {
+            updateSubGenreDropdown(bookTypeSelect.value, genreSelect.value, originalSubGenre);
+        }
+    }
+    
+    function updateGenreDropdown(bookType, selectedValue = '') {
+        if (!bookType) {
+            genreSelect.innerHTML = '<option value="">Any</option>';
+            subGenreSelect.innerHTML = '<option value="">Any</option>';
+            return;
+        }
+        
+        fetch(`/api/genres/${bookType}`)
+            .then(response => response.json())
+            .then(genres => {
+                genreSelect.innerHTML = '<option value="">Any</option>';
+                genres.forEach(genre => {
+                    const option = document.createElement('option');
+                    option.value = genre.name;
+                    option.textContent = genre.name;
+                    if (genre.name === selectedValue) {
+                        option.selected = true;
+                    }
+                    genreSelect.appendChild(option);
+                });
+                
+                // Update sub-genres if genre is selected
+                if (genreSelect.value) {
+                    updateSubGenreDropdown(bookType, genreSelect.value, originalSubGenre);
+                } else {
+                    subGenreSelect.innerHTML = '<option value="">Any</option>';
+                }
+            });
+    }
+    
+    function updateSubGenreDropdown(bookType, genreName, selectedValue = '') {
+        if (!bookType || !genreName) {
+            subGenreSelect.innerHTML = '<option value="">Any</option>';
+            return;
+        }
+        
+        fetch(`/api/subgenres-by-name/${bookType}/${encodeURIComponent(genreName)}`)
+            .then(response => response.json())
+            .then(subgenres => {
+                subGenreSelect.innerHTML = '<option value="">Any</option>';
+                subgenres.forEach(subgenre => {
+                    const option = document.createElement('option');
+                    option.value = subgenre.name;
+                    option.textContent = subgenre.name;
+                    if (subgenre.name === selectedValue) {
+                        option.selected = true;
+                    }
+                    subGenreSelect.appendChild(option);
+                });
+            });
+    }
+});
+</script>
+
+<style>
+.bulk-actions-bar {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f5f5f5;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.bulk-actions-bar label {
+    margin: 0;
+    font-weight: bold;
+}
+</style>
 {% endblock %}

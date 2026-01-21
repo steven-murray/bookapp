@@ -1,14 +1,80 @@
 import requests
-from typing import Optional, Dict, Any
+from typing import Any
+import attrs
 
+@attrs.define
+class OpenLibraryWork:
+    """Data class representing an OpenLibrary Work
+    
+    See:
+    https://github.com/internetarchive/openlibrary/blob/b4afa14b0981ae1785c26c71908af99b879fa975/openlibrary/plugins/worksearch/schemes/works.py#L38-L91
+    """
+    key: str
+    title: str
+    subjects: list[str] | None = None
+    description: str | None = None
+    
+    subtitle: str | None = None
+    alternative_title: str | None = None
+    alternative_subtitle: str | None = None
+    cover_i: int | None = None
+    ebook_access: str | None = None
+    edition_count: int | None = None
+    edition_key: list[str] | None = None
+    format: list[str] | None = None
+    publish_date: list[str] | None = None
+    lccn: list[str] | None = None
+    ia: list[str] | None = None
+    oclc: list[str] | None = None
+    isbn: list[str] | None = None
+    contributor: list[str] | None = None
+    publish_place: list[str] | None = None
+    publisher: list[str] | None = None
+    author_key: list[str] | None = None
+    author_name: list[str] | None = None
+    author_alternative_name: list[str] | None = None
+    subject: list[str] | None = None
+    has_fulltext: bool | None = None
+    title_suggest: str | None = None
+    publish_year: list[int] | None = None
+    language: list[str] | None = None
+    first_publish_year: int | None = None
+    lcc: list[str] | None = None
+    ddc: list[str] | None = None
+    
+    @property
+    def olid(self):
+        return self.key
 class OpenLibraryService:
     """Service for interacting with OpenLibrary API"""
     
     BASE_URL = "https://openlibrary.org"
     
     @staticmethod
-    def search_books(query: str, fields: list[str] = (), limit: int = 10) -> list:
-        """Search for books by title, author, or ISBN"""
+    def author_title_search(
+        title: str | None, 
+        author: str | None = None,
+        fields: str | tuple[str] = (),
+        limit: int = 10
+    ) -> list[OpenLibraryWork]:
+        query = f"title:{title}" if title else ""
+        if author:
+            query += f" author:{author}"
+        return OpenLibraryService.search_books(query=query, fields=fields, limit=limit)
+
+    @staticmethod
+    def search_books(
+        query: str, 
+        fields: str | tuple[str] = (), 
+        limit: int = 10
+    ) -> list[OpenLibraryWork]:
+        """Search for books with arbitrary query string.
+        """
+        if not fields:
+            fields = None
+        elif fields == "all":
+            fields = [field.name for field in attrs.fields(OpenLibraryWork)]
+
         try:
             url = f"{OpenLibraryService.BASE_URL}/search.json"
             params = {
@@ -19,27 +85,20 @@ class OpenLibraryService:
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            
-            books = []
-            for doc in data.get('docs', []):
-                book = {
-                    'title': doc.get('title', ''),
-                    'author': ', '.join(doc.get('author_name', [])),
-                    'isbn': doc.get('isbn', [''])[0] if doc.get('isbn') else '',
-                    'openlibrary_id': doc.get('key', ''),
-                    'cover_id': doc.get('cover_i'),
-                    'publication_year': doc.get('first_publish_year'),
-                    "subjects": doc.get('subject', [])
-                }
-                books.append(book)
-            
-            return books
+
+            # Remove any keys that aren't in OpenLibraryWork
+            valid_keys = {field.name for field in attrs.fields(OpenLibraryWork)}
+            filtered_docs = [
+                {k: v for k, v in doc.items() if k in valid_keys}
+                for doc in data.get('docs', [])
+            ]
+            return [OpenLibraryWork(**doc) for doc in filtered_docs]
         except Exception as e:
             print(f"Error searching OpenLibrary: {e}")
             return []
     
     @staticmethod
-    def get_book_by_isbn(isbn: str) -> Optional[Dict[str, Any]]:
+    def get_book_by_isbn(isbn: str) -> dict[str, Any] | None:
         """Get book details by ISBN"""
         try:
             url = f"{OpenLibraryService.BASE_URL}/isbn/{isbn}.json"
@@ -90,7 +149,7 @@ class OpenLibraryService:
             return None
     
     @staticmethod
-    def get_work(work_key: str) -> Optional[Dict[str, Any]]:
+    def get_work(work_key: str) -> dict[str, Any] | None:
         """Get work details from OpenLibrary"""
         try:
             url = f"{OpenLibraryService.BASE_URL}{work_key}.json"
@@ -102,7 +161,7 @@ class OpenLibraryService:
             return None
     
     @staticmethod
-    def get_author(author_key: str) -> Optional[Dict[str, Any]]:
+    def get_author(author_key: str) -> dict[str, Any] | None:
         """Get author details from OpenLibrary"""
         try:
             url = f"{OpenLibraryService.BASE_URL}{author_key}.json"

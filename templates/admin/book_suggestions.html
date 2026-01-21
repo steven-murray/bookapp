@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Book Suggestions - Book Tracker{% endblock %}
+
+{% block content %}
+<h1>📬 Student Book Suggestions</h1>
+
+<div class="section">
+    <h2>Pending Suggestions ({{ pending|length }})</h2>
+    
+    {% if pending %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Reason</th>
+                    <th>Suggested</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for suggestion in pending %}
+                    <tr>
+                        <td>{{ suggestion.student.first_name }} {{ suggestion.student.last_name }}</td>
+                        <td><strong>{{ suggestion.title }}</strong></td>
+                        <td>{{ suggestion.author }}</td>
+                        <td>
+                            {% if suggestion.reason %}
+                                <small>{{ suggestion.reason[:100] }}{% if suggestion.reason|length > 100 %}...{% endif %}</small>
+                            {% else %}
+                                <em>No reason provided</em>
+                            {% endif %}
+                        </td>
+                        <td>{{ suggestion.suggested_at.strftime('%b %d, %Y') }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="showReviewModal({{ suggestion.id }}, '{{ suggestion.title }}', '{{ suggestion.author }}', 'add')">📚 Add to Library</button>
+                            <button class="btn btn-sm btn-danger" onclick="showReviewModal({{ suggestion.id }}, '{{ suggestion.title }}', '{{ suggestion.author }}', 'reject')">✗ Reject</button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No pending suggestions.</p>
+    {% endif %}
+</div>
+
+<div class="section mt-4">
+    <h2>Recently Reviewed</h2>
+    
+    {% if reviewed %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Status</th>
+                    <th>Reviewed By</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for suggestion in reviewed %}
+                    <tr>
+                        <td>{{ suggestion.student.first_name }} {{ suggestion.student.last_name }}</td>
+                        <td><strong>{{ suggestion.title }}</strong></td>
+                        <td>{{ suggestion.author }}</td>
+                        <td>
+                            {% if suggestion.status == 'approved' %}
+                                <span class="badge" style="background-color: #4CAF50;">✓ Approved</span>
+                            {% elif suggestion.status == 'added' %}
+                                <span class="badge" style="background-color: #2196F3;">📚 Added</span>
+                            {% elif suggestion.status == 'rejected' %}
+                                <span class="badge" style="background-color: #f44336;">✗ Rejected</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if suggestion.reviewed_by %}
+                                {{ suggestion.reviewed_by.first_name }} {{ suggestion.reviewed_by.last_name }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if suggestion.admin_notes %}
+                                <small>{{ suggestion.admin_notes }}</small>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No reviewed suggestions yet.</p>
+    {% endif %}
+</div>
+
+<!-- Review Modal -->
+<div id="reviewModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3 id="modalTitle">Review Suggestion</h3>
+        <form method="POST" id="reviewForm">
+            <input type="hidden" name="action" id="modalAction">
+            
+            <p><strong>Title:</strong> <span id="modalBookTitle"></span></p>
+            <p><strong>Author:</strong> <span id="modalBookAuthor"></span></p>
+            
+            <div class="form-group">
+                <label for="admin_notes">Notes (optional):</label>
+                <textarea name="admin_notes" id="admin_notes" class="form-control" rows="3" placeholder="Add a note for the student..."></textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Submit</button>
+                <button type="button" class="btn btn-secondary" onclick="closeReviewModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+</style>
+
+<script>
+function showReviewModal(suggestionId, title, author, action) {
+    const modal = document.getElementById('reviewModal');
+    const form = document.getElementById('reviewForm');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBookTitle = document.getElementById('modalBookTitle');
+    const modalBookAuthor = document.getElementById('modalBookAuthor');
+    const modalAction = document.getElementById('modalAction');
+    
+    form.action = `/admin/book_suggestion/${suggestionId}/review`;
+    modalBookTitle.textContent = title;
+    modalBookAuthor.textContent = author;
+    modalAction.value = action;
+    
+    if (action === 'add') {
+        modalTitle.textContent = '📚 Add Book to Library';
+    } else if (action === 'reject') {
+        modalTitle.textContent = '✗ Reject Suggestion';
+    }
+    
+    modal.style.display = 'flex';
+}
+
+function closeReviewModal() {
+    document.getElementById('reviewModal').style.display = 'none';
+    document.getElementById('admin_notes').value = '';
+}
+
+// Close modal when clicking outside
+document.getElementById('reviewModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeReviewModal();
+    }
+});
+</script>
+
+{% endblock %}
