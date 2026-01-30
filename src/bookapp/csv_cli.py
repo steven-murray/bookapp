@@ -8,7 +8,7 @@ import attrs
 from pathlib import Path
 import questionary as qs
 from rich.console import Console
-from openlibrary_service import OpenLibraryWork, OpenLibraryService
+from bookapp.openlibrary_service import OpenLibraryWork, OpenLibraryService
 import re
 
 cns = Console()
@@ -16,12 +16,12 @@ app = App()
 
 def get_flask_app():
     """Lazy import to avoid circular dependency"""
-    from app import app as flask_app
+    from bookapp.app import app as flask_app
     return flask_app
 
 def get_genres_from_db(book_type: Literal['Fiction', 'Non-Fiction']) -> dict[str, list[str]]:
     """Get genres and sub-genres from the database for a given book type."""
-    from models import Genre
+    from bookapp.models import Genre
     flask_app = get_flask_app()
     with flask_app.app_context():
         genres = Genre.query.filter_by(book_type=book_type).all()
@@ -33,7 +33,7 @@ def get_genres_from_db(book_type: Literal['Fiction', 'Non-Fiction']) -> dict[str
 
 def get_topics_from_db() -> list[str]:
     """Get all topics from the database."""
-    from models import Topic
+    from bookapp.models import Topic
     flask_app = get_flask_app()
     with flask_app.app_context():
         topics = Topic.query.all()
@@ -41,7 +41,7 @@ def get_topics_from_db() -> list[str]:
 
 def get_genre_maps_from_db() -> dict[str, str]:
     """Get all genre mappings from the database."""
-    from models import GenreMap
+    from bookapp.models import GenreMap
     flask_app = get_flask_app()
     with flask_app.app_context():
         maps = GenreMap.query.all()
@@ -49,7 +49,7 @@ def get_genre_maps_from_db() -> dict[str, str]:
 
 def add_topic_to_db(topic_name: str):
     """Add a new topic to the database."""
-    from models import Topic, db
+    from bookapp.models import Topic, db
     flask_app = get_flask_app()
     with flask_app.app_context():
         # Check if already exists
@@ -62,7 +62,7 @@ def add_topic_to_db(topic_name: str):
 
 def get_best_bet_genres_from_subjects(subjects: list[str]) -> dict[str, str]:
     """Given a list of subjects, return the best book_type, genre, and sub_genre matches."""
-    from models import Genre
+    from bookapp.models import Genre
 
     book_type = None
     genre = None

@@ -1,9 +1,9 @@
 import csv
 import io
 import re
-from models import Book, db
-from openlibrary_service import OpenLibraryService
-from csv_cli import CSVBookRecord, select_best_work, WorkWrapper
+from bookapp.models import Book, db
+from bookapp.openlibrary_service import OpenLibraryService
+from bookapp.csv_cli import CSVBookRecord, select_best_work, WorkWrapper
 import attrs
 
 def book_to_csvbookrecord(b: Book) -> CSVBookRecord:

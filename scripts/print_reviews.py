@@ -1,5 +1,5 @@
-from app import db, app
-from models import Review, User, Book
+from bookapp.app import db, app
+from bookapp.models import Review, User, Book
 
 app.app_context().push()
 

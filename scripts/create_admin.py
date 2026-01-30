@@ -1,8 +1,8 @@
 """
 Helper script to create an admin user
 """
-from app import app, db
-from models import User
+from bookapp.app import app, db
+from bookapp.models import User
 
 def create_admin():
     with app.app_context():

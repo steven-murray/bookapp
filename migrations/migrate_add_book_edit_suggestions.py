@@ -1,8 +1,8 @@
 """
 Migration script to add the BookEditSuggestion table for students to suggest edits to existing books.
 """
-from app import app
-from models import db
+from bookapp.app import app
+from bookapp.models import db
 
 def migrate():
     with app.app_context():

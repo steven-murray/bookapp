@@ -5,8 +5,8 @@ This prevents duplicate books from being added.
 Run this script after updating the models.py file with the new constraint.
 """
 
-from app import app, db
-from models import Book
+from bookapp.app import app, db
+from bookapp.models import Book
 from sqlalchemy import text
 
 def add_unique_constraint():

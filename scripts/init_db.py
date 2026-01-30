@@ -3,8 +3,8 @@ Initialize or update database schema.
 This script creates all tables based on the SQLAlchemy models.
 Safe to run multiple times - will only create missing tables.
 """
-from app import app
-from models import db
+from bookapp.app import app
+from bookapp.models import db
 
 def init_db():
     with app.app_context():

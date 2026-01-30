@@ -2,8 +2,8 @@
 Migration script to create Genre and SubGenre tables and populate from genres_and_topics.toml
 """
 import toml
-from app import app
-from models import db, Genre, SubGenre, Topic, GenreMap
+from bookapp.app import app
+from bookapp.models import db, Genre, SubGenre, Topic, GenreMap
 
 def load_genres_from_toml():
     """Load genres and sub-genres from TOML file"""

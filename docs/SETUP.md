@@ -26,17 +26,17 @@ Edit `.env` file and change the SECRET_KEY to something secure.
 
 ## 4. Initialize Database
 ```powershell
-uv run python -c "from app import app, db; app.app_context().push(); db.create_all(); print('Database created!')"
+uv run python -c "from bookapp.app import app, db; app.app_context().push(); db.create_all(); print('Database created!')"
 ```
 
 ## 5. Create Admin User
 ```powershell
-uv run python create_admin.py
+uv run python scripts/create_admin.py
 ```
 
 ## 6. Run the Application
 ```powershell
-uv run python app.py
+uv run python scripts/run.py
 ```
 
 ## 7. Access the App

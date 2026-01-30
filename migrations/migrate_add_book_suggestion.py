@@ -4,8 +4,8 @@ Migration script to add the book_suggestion table for student book suggestions.
 Run this script to create the new table in your database.
 """
 
-from app import app, db
-from models import BookSuggestion
+from bookapp.app import app, db
+from bookapp.models import BookSuggestion
 
 def create_book_suggestion_table():
     with app.app_context():

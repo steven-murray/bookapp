@@ -58,7 +58,7 @@ The unique constraint will be automatically created when you run `db.create_all(
 Run the migration script:
 
 ```bash
-python migrate_add_unique_constraint.py
+python migrations/migrate_add_unique_constraint.py
 ```
 
 This script will:

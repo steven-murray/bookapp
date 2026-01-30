@@ -20,5 +20,5 @@ EXPOSE 8080
 
 # Run database setup and start gunicorn
 # Use db.create_all() instead of upgrade-db for Postgres compatibility
-CMD python -c "from app import app, db; app.app_context().push(); db.create_all(); print('Database ready')" && \
-    gunicorn -w 2 -k gthread --timeout 120 -b 0.0.0.0:${PORT:-8080} app:app
+CMD python -c "from bookapp.app import app, db; app.app_context().push(); db.create_all(); print('Database ready')" && \
+    gunicorn -w 2 -k gthread --timeout 120 -b 0.0.0.0:${PORT:-8080} bookapp.app:app

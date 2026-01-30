@@ -15,16 +15,16 @@
 ### Option 1: Using the deployment script (Linux/Mac/Git Bash)
 
 ```bash
-# Edit deploy-gcp.sh and set your PROJECT_ID
-chmod +x deploy-gcp.sh
-./deploy-gcp.sh
+# Edit scripts/deploy-gcp.sh and set your PROJECT_ID
+chmod +x scripts/deploy-gcp.sh
+./scripts/deploy-gcp.sh
 ```
 
 ### Option 2: Using PowerShell (Windows)
 
 ```powershell
-# Edit deploy-gcp.ps1 and set your PROJECT_ID
-.\deploy-gcp.ps1
+# Edit scripts/deploy-gcp.ps1 and set your PROJECT_ID
+.\scripts\deploy-gcp.ps1
 ```
 
 ### Option 3: Manual deployment

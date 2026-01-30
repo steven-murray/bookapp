@@ -1,3 +1,26 @@
+Metadata-Version: 2.4
+Name: bookapp
+Version: 0.1.0
+Summary: A book tracking application for students
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: flask>=3.0.0
+Requires-Dist: flask-sqlalchemy>=3.1.1
+Requires-Dist: flask-login>=0.6.3
+Requires-Dist: flask-wtf>=1.2.1
+Requires-Dist: wtforms>=3.1.1
+Requires-Dist: werkzeug>=3.0.1
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: requests>=2.31.0
+Requires-Dist: email-validator>=2.1.0
+Requires-Dist: gunicorn>=23.0.0
+Requires-Dist: psycopg2-binary>=2.9.10
+Requires-Dist: ipython>=8.12.3
+Requires-Dist: cyclopts>=2.9.9
+Requires-Dist: attrs>=25.3.0
+Requires-Dist: questionary>=2.1.0
+Requires-Dist: toml>=0.10.2
+
 # 📚 Book Tracker for Students
 
 My little test of vibe-coding..
@@ -80,12 +103,12 @@ A comprehensive web application designed for students to track their reading pro
 
 6. **Initialize the database**
    ```powershell
-   uv run python -c "from bookapp.app import app, db; app.app_context().push(); db.create_all(); print('Database created!')"
+   uv run python -c "from app import app, db; app.app_context().push(); db.create_all(); print('Database created!')"
    ```
 
 7. **Create an admin user**
    ```powershell
-   uv run python scripts/create_admin.py
+   uv run python create_admin.py
    ```
    Follow the prompts to create your first administrator account.
 
@@ -93,12 +116,12 @@ A comprehensive web application designed for students to track their reading pro
 
 1. **Start the Flask development server**
    ```powershell
-   uv run python scripts/run.py
+   uv run python app.py
    ```
    
    Or use the shorthand:
    ```powershell
-   uv run flask --app bookapp.app run
+   uv run flask run
    ```
 
 2. **Open your browser and navigate to**
@@ -298,20 +321,20 @@ If you see "Import could not be resolved" errors in your editor, make sure:
 To reset the database:
 ```powershell
 Remove-Item bookapp.db
-uv run python -c "from bookapp.app import app, db; app.app_context().push(); db.create_all(); print('Database recreated!')"
+uv run python -c "from app import app, db; app.app_context().push(); db.create_all(); print('Database recreated!')"
 ```
 
 ### Database Upgrades (adding new columns)
 If you pull new changes that add fields (like `book_type` or `sub_genre`) and you're using an existing SQLite DB, run the lightweight upgrade:
 
 ```powershell
-uv run flask --app bookapp.app upgrade-db
+uv run flask --app app upgrade-db
 ```
 
 This command is idempotent and safe to run multiple times; it only adds missing columns.
 
 ### Port Already in Use
-If port 5000 is already in use, modify `scripts/run.py`:
+If port 5000 is already in use, modify `app.py`:
 ```python
 if __name__ == '__main__':
     app.run(debug=True, port=5001)  # Change port

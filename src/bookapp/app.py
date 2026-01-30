@@ -2,17 +2,24 @@ import click
 from flask import Flask, render_template, redirect, url_for, flash, request, send_file, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from functools import wraps
-from config import Config
-from models import db, User, Class, Book, Review, BookRead, ReadingListItem, SuggestedBook, BookSuggestion, BookEditSuggestion, Genre, SubGenre, Topic, GenreMap
-from forms import (LoginForm, RegistrationForm, ClassForm, BookForm, CSVUploadForm, 
+import os
+from bookapp.config import Config
+from bookapp.models import db, User, Class, Book, Review, BookRead, ReadingListItem, SuggestedBook, BookSuggestion, BookEditSuggestion, Genre, SubGenre, Topic, GenreMap
+from bookapp.forms import (LoginForm, RegistrationForm, ClassForm, BookForm, CSVUploadForm, 
                    ReviewForm, SuggestBookForm, SearchBookForm, StudentBookFilterForm, BookSuggestionForm)
-from openlibrary_service import OpenLibraryService
-from book_import_service import BookImportService, enrich_book_from_openlibrary
+from bookapp.openlibrary_service import OpenLibraryService
+from bookapp.book_import_service import BookImportService, enrich_book_from_openlibrary
 from datetime import datetime
 import io
 from sqlalchemy import or_
+from bookapp.rls_middleware import setup_rls_middleware
 
-app = Flask(__name__)
+# Get project root directory (2 levels up from this file)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+
+app = Flask(__name__,
+            template_folder=os.path.join(project_root, 'templates'),
+            static_folder=os.path.join(project_root, 'static'))
 app.config.from_object(Config)
 
 # Initialize extensions
@@ -20,6 +27,8 @@ db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+setup_rls_middleware(app)
 
 @login_manager.user_loader
 def load_user(user_id):
